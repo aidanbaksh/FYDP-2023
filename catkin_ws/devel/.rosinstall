@@ -1,0 +1,2 @@
+- setup-file:
+    local-name: /home/capstone/catkin_ws/devel/setup.sh
