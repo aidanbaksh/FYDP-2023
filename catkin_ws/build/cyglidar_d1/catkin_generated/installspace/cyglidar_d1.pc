@@ -1,8 +1,0 @@
-prefix=/home/capstone/catkin_ws/install
-
-Name: cyglidar_d1
-Description: Description of cyglidar_d1
-Version: 0.0.2
-Cflags: -I${prefix}/include
-Libs: -L${prefix}/lib 
-Requires: 
