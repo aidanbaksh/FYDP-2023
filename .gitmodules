@@ -1,0 +1,3 @@
+[submodule "catkin_ws/src/i2c/libi2c"]
+	path = catkin_ws/src/i2c/libi2c
+	url = https://github.com/amaork/libi2c.git
