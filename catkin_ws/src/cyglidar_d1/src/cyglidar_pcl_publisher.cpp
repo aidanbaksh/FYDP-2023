@@ -243,7 +243,7 @@ void cloudScatter_3D()
     }
 }
 
-int FREQUENCY_LEVEL, PULSE_DURATION;
+int FREQUENCY_LEVEL, PULSE_DURATION, LIDAR_NUM;
 void running()
 {
     // Create node handlers and local variables
@@ -263,6 +263,7 @@ void running()
     priv_nh.param("frequency", FREQUENCY_LEVEL, 0);
     priv_nh.param("set_auto_duration", setAutoDuration, 0);
     priv_nh.param("duration", PULSE_DURATION, 0);
+    priv_nh.param("lidar_num", LIDAR_NUM, 0);
 
     // injection run mode
     eRunMode LiDAR_RunMode;
@@ -283,9 +284,9 @@ void running()
     }
 
     // Check whether the values are applied properly
-    ROS_INFO("FREQUENCY: %d (%x) / PULSE CONTROL: %d, DURATION: %d (%x)", \
+    ROS_INFO("FREQUENCY: %d (%x) / PULSE CONTROL: %d, DURATION: %d (%x), PORT: %d (%x)", \
     FREQUENCY_LEVEL, FREQUENCY_LEVEL, \
-    setAutoDuration, PULSE_DURATION, PULSE_DURATION);
+    setAutoDuration, PULSE_DURATION, PULSE_DURATION, LIDAR_NUM);
 
     // Call the following function so as to store colors to draw 3D data
     colorBuffer();
@@ -296,9 +297,9 @@ void running()
     }
 
     // Initialize variables
-    pub_scan = nh.advertise<sensor_msgs::LaserScan>("scan_laser", SCAN_MAX_SIZE);
-    pub_2D = nh.advertise<sensor_msgs::PointCloud2>("scan_2D", 1);
-    pub_3D = nh.advertise<sensor_msgs::PointCloud2>("scan_3D", 1);
+    pub_scan = nh.advertise<sensor_msgs::LaserScan>("scan_laser_" + std::to_string(LIDAR_NUM), SCAN_MAX_SIZE);
+    pub_2D = nh.advertise<sensor_msgs::PointCloud2>("scan_2D_" + std::to_string(LIDAR_NUM), 1);
+    pub_3D = nh.advertise<sensor_msgs::PointCloud2>("scan_3D_" + std::to_string(LIDAR_NUM), 1);
 
     scan_2D = pcl::PointCloud<pcl::PointXYZRGBA>::Ptr(new pcl::PointCloud<pcl::PointXYZRGBA>);
     scan_3D = pcl::PointCloud<pcl::PointXYZRGBA>::Ptr(new pcl::PointCloud<pcl::PointXYZRGBA>);

@@ -1,4 +1,5 @@
 # set the udev rule, get the device_port fixed by cyglidar
 #
-KERNEL=="ttyUSB*", ATTRS{idVendor}=="067b", ATTRS{idProduct}=="2303", MODE:="0777", SYMLINK+="cyglidar"
-
+KERNEL=="ttyUSB0", ATTRS{idVendor}=="067b", ATTRS{idProduct}=="2303", MODE:="0777", SYMLINK+="cyglidar0"
+KERNEL=="ttyUSB1", ATTRS{idVendor}=="067b", ATTRS{idProduct}=="2303", MODE:="0777", SYMLINK+="cyglidar1"
+KERNEL=="ttyUSB2", ATTRS{idVendor}=="067b", ATTRS{idProduct}=="2303", MODE:="0777", SYMLINK+="cyglidar2"
