@@ -51,7 +51,7 @@ void I2C_Manager::close() {
 void I2C_Manager::timer_callback() {
     // spin the node while data is not available
     while (!data_available.test()) {
-        ros::spin()
+        ros::spin();
     }
 
     // TODO: publish data
