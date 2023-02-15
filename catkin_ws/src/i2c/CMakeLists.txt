@@ -7,6 +7,7 @@ add_compile_options(-std=c++2a)
 
 find_package(catkin REQUIRED COMPONENTS
   roscpp
+  std_msgs
 )
 
 # build libi2c

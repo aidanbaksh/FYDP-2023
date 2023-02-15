@@ -2,6 +2,7 @@
 
 #include <thread>
 #include <atomic>
+#include <array>
 #include <string>
 
 #include <ros/ros.h>
@@ -19,6 +20,11 @@ class I2C_Manager {
     static constexpr unsigned int ARDUINO_ADDR = 0x10;
     static constexpr unsigned int IMU_ADDR = 0x20;
 
+    static constexpr size_t NUM_ULTRASONICS = 2; // 1 per ultrasonic
+    static const std::array<std::string, NUM_ULTRASONICS> ULTRASONIC_TOPICS;
+
+    static constexpr size_t PUBLISH_INTERVAL_MS = 100;
+
 public:
     I2C_Manager(ros::NodeHandle&);
 
@@ -33,18 +39,22 @@ public:
 
 private:
     // intermittendly publishes updates
-    void timer_callback();
+    void timer_callback(const ros::TimerEvent&);
 
     // thread that actually communicates with devices
     void read_devices();
 
     ros::NodeHandle& nh;
 
-    std::atomic_flag data_available;
-    std::thread device_reader;
+    std::atomic_flag data_available, stopped;
+    ros::Timer timer;
+    std::array<ros::Publisher, NUM_ULTRASONICS> publishers;
 
     int bus_fd;
     I2CDevice arduino, imu;
+
+    int32_t ultrasonic_buffer[NUM_ULTRASONICS];
+    std::thread device_reader;
 };
 
 }
