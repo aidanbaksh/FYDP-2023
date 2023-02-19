@@ -2,7 +2,7 @@
 <package format="2">
   <name>lidar_merge</name>
   <version>0.0.0</version>
-  <description>The lidar_merge package</description>
+  <description>Merges LIDAR point clouds to a single point cloud</description>
 
   <!-- One maintainer tag required, multiple allowed, one person per tag -->
   <!-- Example:  -->
