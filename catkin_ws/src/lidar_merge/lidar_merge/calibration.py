@@ -71,7 +71,7 @@ class Calibration:
 
     """Performs the calibration"""
     def run(self) -> None:
-        print('waiting for enough measurements')
+        rospy.loginfo("Starting calibration")
         # # wait until we have enough distance measurements from back ultrasonic before proceeding
         # while len(self._back_distance_readings) < self._back_distance_readings.maxlen:
         #     rospy.spin()
@@ -106,19 +106,24 @@ class Calibration:
         # optimize to find best guess for lidar positions
         result = scipy.optimize.minimize(self._compute_cost, initial_guess, options={'maxiter': 1})
 
-        print('optimize result', result)
-
         # handle error if solver failed to converge
         if not result.success:
             rospy.logfatal("Calibration failed to converge to a solution!")
-            rospy.info("Optimization message: %s", result.message)
+            rospy.loginfo("Optimization message: %s", result.message)
             return  # just give up
 
-        # extract solution and publish results
+        # extract transform matrices from solution
         front_left_tf, front_right_tf, back_tf = self._tfs_from_solution(result.x)
-        self._publish_tf(constants.FRONT_LEFT_FRAME, front_left_tf)
-        self._publish_tf(constants.FRONT_RIGHT_FRAME, front_right_tf)
-        self._publish_tf(constants.BACK_FRAME, back_tf)
+        # format transforms as geometry_msgs.TransformStamped
+        formatted_tfs = []
+        formatted_tfs.append(self._format_tf(constants.FRONT_LEFT_FRAME, front_left_tf))
+        formatted_tfs.append(self._format_tf(constants.FRONT_RIGHT_FRAME, front_right_tf))
+        formatted_tfs.append(self._format_tf(constants.BACK_FRAME, back_tf))
+        # publish transforms
+        # all have to be published at once due to a bug with StaticTransformBroadcaster
+        # https://answers.ros.org/question/287469/unable-to-publish-multiple-static-transformations-using-tf/
+        self._tf_publisher.sendTransform(formatted_tfs)
+        rospy.loginfo("Published calibrated transforms")
 
     def _tfs_from_solution(self, x: np.ndarray) -> Tuple[np.ndarray]:
         # extract values from current solution vector
@@ -187,18 +192,26 @@ class Calibration:
         T[0:3, 3] = offset
         return T
 
-    """Convenience method which formats and publishes a transform"""
-    def _publish_tf(self, lidar_frame: str, T: np.ndarray) -> TransformStamped:
+    """Convenience method which formats transformation matrix as a TransformStamped"""
+    def _format_tf(self, lidar_frame: str, T: np.ndarray) -> TransformStamped:
         # create message with frame ids
         t = TransformStamped()
         t.header.stamp = rospy.Time.now()
         t.header.frame_id = constants.WHEELCHAIR_FRAME
         t.child_frame_id = lidar_frame
+
         # convert transformation matrix into translation and rotation
-        t.transform.translation = tf_conversions.transformations.translation_from_matrix(T)
-        t.transform.rotation = tf_conversions.transformations.quaternion_from_matrix(T)
-        # publish
-        self._tf_publisher.sendTransform(t)
+        x, y, z = tf_conversions.transformations.translation_from_matrix(T)
+        t.transform.translation.x = x
+        t.transform.translation.y = y
+        t.transform.translation.z = z
+        qx, qy, qz, qw = tf_conversions.transformations.quaternion_from_matrix(T)
+        t.transform.rotation.x = qx
+        t.transform.rotation.y = qy
+        t.transform.rotation.z = qz
+        t.transform.rotation.w = qw
+
+        return t
 
 
 # essentially the main function, called by calibrate script
