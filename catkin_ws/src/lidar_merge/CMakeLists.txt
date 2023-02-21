@@ -3,18 +3,8 @@ project(lidar_merge)
 
 # use gcc 11 and compile with c++17 features enabled
 # c++20 is not used due to an issue with boost signals2: https://github.com/boostorg/signals2/issues/50
-# set(CMAKE_CXX_COMPILER g++-11)
-add_compile_options(-std=c++11)
-
-message("PCL ROS dir is ${PCL_ROS_DIR}")
-message("pcl ros dir is ${pcl_ros_DIR}")
-message("pcl dir is ${PCL_DIR}")
-message("home is ${HOME}")
-message("module path ${CMAKE_MODULE_PATH}")
-
-# set(PCL_ROS_DIR ${HOME}/noetic_install/install_isolated/share/pcl_ros/cmake)
-# find_package(pcl_ros REQUIRED)
-# find_package(PCL_ROS REQUIRED)
+set(CMAKE_CXX_COMPILER g++-11)
+add_compile_options(-std=c++17)
 
 find_package(catkin REQUIRED COMPONENTS
   roscpp
@@ -24,13 +14,6 @@ find_package(catkin REQUIRED COMPONENTS
   tf_conversions
   pcl_ros
 )
-
-add_definitions(${pcl_ros_DEFINITIONS})
-
-SET(CMAKE_CXX_FLAGS "-O0")
-
-message("pcl include dirs ${pcl_ros_INCLUDE_DIRS}")
-message("pcl ros defns ${pcl_ros_DEFINITIONS}")
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
@@ -61,7 +44,6 @@ catkin_package(
 ## Your package locations should be listed before other locations
 include_directories(
   include
-  ${pcl_ros_INCLUDE_DIRS}
   ${catkin_INCLUDE_DIRS}
 )
 
@@ -85,7 +67,6 @@ add_executable(${PROJECT_NAME}_node
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(${PROJECT_NAME}_node
-  ${pcl_ros_LIBRARY_DIR}
   ${catkin_LIBRARIES}
 )
 

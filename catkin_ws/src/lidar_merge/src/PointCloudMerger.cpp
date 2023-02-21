@@ -42,6 +42,7 @@ bool PointCloudMerger::get_lidar_transforms(double timeout) {
 }
 
 void PointCloudMerger::start() {
+    // create point cloud subscribers
     for (size_t i = 0; i < POINTCLOUD_TOPICS.size(); ++i) {
         pointcloud_subscribers[i] = nh.subscribe<sensor_msgs::PointCloud2>(
             POINTCLOUD_TOPICS[i], QUEUE_SIZE,
@@ -49,18 +50,19 @@ void PointCloudMerger::start() {
         );
     }
 
+    // create merged pointcloud publisher
     nh.advertise<sensor_msgs::PointCloud2>(lidar_merge::MERGED_POINTCLOUD_TOPIC, QUEUE_SIZE);
 }
 
-void PointCloudMerger::receive_pointcloud(const sensor_msgs::PointCloud2& msg, size_t lidar_idx) {
+void PointCloudMerger::receive_pointcloud(const sensor_msgs::PointCloud2::ConstPtr& msg, size_t lidar_idx) {
     // extract all points from pointcloud message
     pcl::PointCloud<PointT> cloud;
-    pcl::fromROSMsg(msg, cloud);
+    pcl::fromROSMsg(*msg, cloud);
 
     // transform pointcloud to wheelchair frame and store it
     pcl::PointCloud<PointT> cloud_in_wheelchair_frame;
     const geometry_msgs::Transform &transform = pointcloud_transforms[lidar_idx].transform;
-    pcl::transformPointCloud(cloud, cloud_in_wheelchair_frame, transform);
+    pcl_ros::transformPointCloud(cloud, cloud_in_wheelchair_frame, transform);
     pointclouds[lidar_idx] = std::move(cloud_in_wheelchair_frame);
 
     // mark this lidar as ready to be merged

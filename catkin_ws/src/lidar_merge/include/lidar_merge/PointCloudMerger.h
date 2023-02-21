@@ -42,7 +42,7 @@ public:
     void start();
 
 private:
-    void receive_pointcloud(const sensor_msgs::PointCloud2&, size_t);
+    void receive_pointcloud(const sensor_msgs::PointCloud2::ConstPtr&, size_t);
     void merge() const;
 
     ros::NodeHandle& nh;
