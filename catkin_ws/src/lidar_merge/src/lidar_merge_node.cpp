@@ -1,6 +1,5 @@
 #include <ros/ros.h>
-
-#include "lidar_merge/PointCloudMerger.hpp"
+#include "lidar_merge/PointCloudMerger.h"
 
 
 int main(int argc, char **argv) {
@@ -8,9 +7,10 @@ int main(int argc, char **argv) {
     ros::NodeHandle nh;
 
     lidar_merge::PointCloudMerger merger(nh);
+    merger.get_lidar_transforms();
+    merger.start();
 
     // spin the node so it never exits
-    // effectively equivalent to joining the device reader thread
     ros::spin();
 
     return 0;

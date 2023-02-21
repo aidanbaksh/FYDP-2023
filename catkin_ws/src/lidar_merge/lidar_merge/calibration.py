@@ -55,11 +55,11 @@ class Calibration:
     def __init__(self):
         rospy.init_node('lidar_merge_calibration')
 
-        # initialize distance subscribers
+        # initialize back distance subscriber
         self._back_distance_subscriber = rospy.Subscriber(
             '/ultrasonics/back_housing', Float32, self._ultrasonic_reading_callback
         )
-        # keep track of readings from ultrasonics
+        # keep track of readings from back ultrasonic
         self._back_distance_readings = collections.deque([], Calibration.NUM_DISTANCE_READINGS)
 
         # publisher of calibrated transforms
@@ -105,6 +105,8 @@ class Calibration:
 
         # optimize to find best guess for lidar positions
         result = scipy.optimize.minimize(self._compute_cost, initial_guess, options={'maxiter': 1})
+
+        print('optimize result', result)
 
         # handle error if solver failed to converge
         if not result.success:
@@ -180,7 +182,7 @@ class Calibration:
         # as a result, x is the first angle, then z, then y
         # to accomplush this, use 'r'otating frame
         # https://github.com/ros/geometry/blob/hydro-devel/tf/src/tf/transformations.py#L77-L91
-        T = tf_conversions.transformations.euler_matrix(*euler_angles, 'rxzy')
+        T = tf_conversions.transformations.euler_matrix(*np.radians(euler_angles), 'rxzy')
         # add translation offset
         T[0:3, 3] = offset
         return T
@@ -203,3 +205,5 @@ class Calibration:
 def run():
     calibration = Calibration()
     calibration.run()
+
+    rospy.spin()
