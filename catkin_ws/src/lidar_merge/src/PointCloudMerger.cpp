@@ -22,6 +22,8 @@ PointCloudMerger::PointCloudMerger(ros::NodeHandle& nh):
 }
 
 bool PointCloudMerger::get_lidar_transforms(double timeout) {
+    ROS_INFO("Getting lidar transforms...");
+
     // setup transform listener with 30s buffer
     tf2_ros::Buffer tf_buffer(ros::Duration(30));
     tf2_ros::TransformListener tf_listener(tf_buffer);
@@ -29,6 +31,8 @@ bool PointCloudMerger::get_lidar_transforms(double timeout) {
     // get transform from each lidar to wheelchair frame
     for (size_t i = 0; i < POINTCLOUD_FRAMES.size(); ++i) {
         try {
+            ROS_INFO_STREAM("Looking up transform from " << POINTCLOUD_FRAMES[i]
+                << " to " << WHEELCHAIR_FRAME);
             pointcloud_transforms[i] = tf_buffer.lookupTransform(
                 POINTCLOUD_FRAMES[i], WHEELCHAIR_FRAME, ros::Time(0), ros::Duration(timeout)
             );
@@ -38,7 +42,7 @@ bool PointCloudMerger::get_lidar_transforms(double timeout) {
         }
     }
 
-    ROS_INFO("Got lidar transforms successfully.");
+    ROS_INFO("Got lidar transforms successfully!");
     return true; // success
 }
 
@@ -52,7 +56,7 @@ void PointCloudMerger::start() {
     }
 
     // create merged pointcloud publisher
-    nh.advertise<sensor_msgs::PointCloud2>(lidar_merge::MERGED_POINTCLOUD_TOPIC, QUEUE_SIZE);
+    merged_publisher = nh.advertise<sensor_msgs::PointCloud2>(lidar_merge::MERGED_POINTCLOUD_TOPIC, QUEUE_SIZE);
 
     ROS_INFO("Setup lidar pointclouder subscribers and merge publisher.");
 }
@@ -87,9 +91,13 @@ void PointCloudMerger::merge() const {
         merged += lidar_cloud;
     }
 
-    // publish the merged point clouds
+    // construct ROS msg from merged point clouds and publish
     sensor_msgs::PointCloud2 msg;
     pcl::toROSMsg(merged, msg);
+    // frame_id must be appended after converting pcl::PointCloud to sensor_msgs::PointCloud2
+    // otherwise the field is overwritten
+    msg.header.stamp = ros::Time::now();
+    msg.header.frame_id = WHEELCHAIR_FRAME;
     merged_publisher.publish(msg);
 }
 

@@ -40,8 +40,8 @@ class Calibration:
     FRONT_MOUNT_Y_OFFSET_GUESS: float = 0.6  # approx 2ft
 
     # lidar initial guess are (pitch, yaw)
-    FRONT_LEFT_MOUNT_GUESS: Tuple[float] = (-20, 10)
-    FRONT_RIGHT_MOUNT_GUESS: Tuple[float] = (-20, -10)
+    FRONT_LEFT_MOUNT_GUESS: Tuple[float] = (-40, 10)
+    FRONT_RIGHT_MOUNT_GUESS: Tuple[float] = (-40, -10)
     FRONT_POST_ANGLE_GUESS: float = 30
 
     FRONT_MOUNT_X_OFFSET_GUESS: float = 0.2  # 20cm
@@ -172,15 +172,7 @@ class Calibration:
     """Convenience method to generate front lidar transformation matrix"""
     def _front_lidar_tf_matrix(self, pitch: float, yaw: float, post_angle: float, offset: np.ndarray) -> np.ndarray:
         global_pitch = post_angle + pitch
-        return self._tf_matrix((global_pitch, yaw, 0), offset)
-
-    """Convenience method to generate back lidar transformation matrix"""
-    def _back_lidar_tf_matrix(self, pitch: float, offset: np.ndarray) -> np.ndarray:
-        assert(offset[0] == 0)  # along x axis
-        return self._tf_matrix((pitch, 0, 0), offset)
-
-    """Generates a transformation matrix from Euler angles and an offset from the wheelchair frame"""
-    def _tf_matrix(self, euler_angles: Tuple[float], offset: np.ndarray):
+        euler_angles = (global_pitch, yaw, 0)
         # generate rotation matrix from euler angles
         # the order of euler angles is imporant
         # the first adjustment angle is the pitch of the sensor housing, then the yaw
@@ -188,6 +180,21 @@ class Calibration:
         # to accomplush this, use 'r'otating frame
         # https://github.com/ros/geometry/blob/hydro-devel/tf/src/tf/transformations.py#L77-L91
         T = tf_conversions.transformations.euler_matrix(*np.radians(euler_angles), 'rxzy')
+        # add translation offset
+        T[0:3, 3] = offset
+        return T
+
+    """Convenience method to generate back lidar transformation matrix"""
+    def _back_lidar_tf_matrix(self, pitch: float, offset: np.ndarray) -> np.ndarray:
+        assert(offset[0] == 0)  # along x axis
+
+        euler_angles = (pitch, 180, 0)
+        # generate rotation matrix from euler angles
+        # the only adjustment angle is the pitch of the sensor housing,
+        # however, the back sensor housing points backwards, as a result rotate 180 around z first
+        # to accomplush this, use 's'tatic frame
+        # https://github.com/ros/geometry/blob/hydro-devel/tf/src/tf/transformations.py#L77-L91
+        T = tf_conversions.transformations.euler_matrix(*np.radians(euler_angles), 'sxzy')
         # add translation offset
         T[0:3, 3] = offset
         return T
