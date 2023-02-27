@@ -62,11 +62,11 @@ install(DIRECTORY launch/
 install(DIRECTORY config param
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
 
-add_executable(plane_detector src/plane_detector.cpp)
+# add_executable(plane_detector src/plane_detector.cpp)
 
-target_link_libraries(plane_detector
-    ${PROJECT_NAME}
-    ${catkin_LIBRARIES}
-    ${PCL_LIBRARIES})
+# target_link_libraries(plane_detector
+#     ${PROJECT_NAME}
+#     ${catkin_LIBRARIES}
+#     ${PCL_LIBRARIES})
 
-add_dependencies(plane_detector ${PROJECT_NAME}_generate_messages_cpp)
+# add_dependencies(plane_detector ${PROJECT_NAME}_generate_messages_cpp)
