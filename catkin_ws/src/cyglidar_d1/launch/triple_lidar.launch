@@ -32,7 +32,7 @@
   <node pkg="cyglidar_d1" type="cyglidar_pcl_publisher" name="lidar_three" output="screen">
     <param name="port" value="/dev/cyglidar2"/>
     <param name="baud_rate" value="3000000"/>
-    <param name="frame_id" value="liad_2"/>
+    <param name="frame_id" value="lidar_2"/>
     <param name="fixed_frame" value="/map"/>
     <param name="run_mode" value="$(arg version)"/>
     <param name="frequency" value="$(arg frequency_level)"/>
@@ -42,7 +42,7 @@
   </node>
 
   <node pkg="rviz" type="rviz" name="rviz" args="-d $(find cyglidar_d1)/rviz/cyglidar_config.rviz"/>
-  <node pkg="tf" type="static_transform_publisher" name="to_laserlink" args="0 0 0 0 0 0 1 map lidar_0 10"/>
-  <node pkg="tf" type="static_transform_publisher" name="to_laserlink" args="0 0 0 0 0 0 1 map lidar_1 10"/>
-  <node pkg="tf" type="static_transform_publisher" name="to_laserlink" args="0 0 0 0 0 0 1 map lidar_2 10"/>
+  <node pkg="tf" type="static_transform_publisher" name="lidar_1" args="0 0 0 0 0 0 1 map lidar_0 10"/>
+  <node pkg="tf" type="static_transform_publisher" name="lidar_2" args="0 0 0 0 0 0 1 map lidar_1 10"/>
+  <node pkg="tf" type="static_transform_publisher" name="lidar_3" args="0 0 0 0 0 0 1 map lidar_2 10"/>
 </launch>
