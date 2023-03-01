@@ -2,9 +2,9 @@
 
 constexpr uint8_t I2C_ADDR = 0x10;
 
-constexpr unsigned int TRIGGER = 50;
+constexpr unsigned int TRIGGER = 2;
 constexpr size_t NUM_ULTRASONICS = 2;
-constexpr unsigned int ECHO[NUM_ULTRASONICS] = {26, 28};
+constexpr unsigned int ECHO[NUM_ULTRASONICS] = {5, 7};
 
 constexpr double SPEED_OF_SOUND = 343.0 * 100 / 1000000; // m/s to cm/s to cm/microsecond
 
@@ -40,7 +40,7 @@ void loop() {
   delayMicroseconds(10);
   digitalWrite(TRIGGER, LOW);
 
-  // wait for all triggers to go high
+  // wait for all sensors to send pulse
   bool all_high = false;
   while (!all_high) {
     all_high = true;
@@ -59,11 +59,11 @@ void loop() {
   while (!all_complete) {
     all_complete = true;
     for (size_t i = 0; i < NUM_ULTRASONICS; ++i) {
-      if (digitalRead(ECHO[i]) == LOW) {
+      if (digitalRead(ECHO[i]) == HIGH) {
+        all_complete = false;
+      } else if (!pulses[i].complete) {
         pulses[i].end = micros();
         pulses[i].complete = true;
-      } else {
-        all_complete = false;
       }
     }
   }
@@ -75,10 +75,10 @@ void loop() {
     ultrasonic_distances[i] = duration * SPEED_OF_SOUND / 2;
 
     // TODO: remove me
-    // Serial.print("Sensor " + String(i) + ": ");
-    // Serial.print(ultrasonic_distances[i]);
-    // Serial.print("  start at ");
-    // Serial.println(pulses[i].start);
+    Serial.print("Sensor " + String(i) + ": ");
+    Serial.println(ultrasonic_distances[i]);
+
+    delay(100);
   }
 }
 
