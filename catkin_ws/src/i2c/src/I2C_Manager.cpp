@@ -24,11 +24,11 @@ I2C_Manager::I2C_Manager(ros::NodeHandle& nh):
             &I2C_Manager::timer_callback, this
         )
     ),
-    publishers(),
+    ultrasonic_publishers(),
     bus_fd(-1),
     arduino(),
     imu(),
-    device_reader(&I2C_Manager::read_devices, this)
+    device_reader(&I2C_Manager::get_data, this)
 
 {
     // thread is not stopped;
@@ -38,10 +38,11 @@ I2C_Manager::I2C_Manager(ros::NodeHandle& nh):
     // set the flag so the device_reader thread blocks until init is called
     data_available.test_and_set(std::memory_order_seq_cst);
 
-    // create publishers for ultrasonic topics
+    // create publishers for ultrasonics and imu
     for (size_t i = 0; i < NUM_ULTRASONICS; ++i) {
-        publishers[i] = nh.advertise<std_msgs::Float32>(ULTRASONIC_TOPICS[i], 5);
+        ultrasonic_publishers[i] = nh.advertise<std_msgs::Float32>(ULTRASONIC_TOPICS[i], 5);
     }
+    imu_publisher = nh.advertise<std_msgs::Float32>(IMU_TOPIC, 5);
 
     // clear data buffer
     std::memset(ultrasonic_buffer, 0, sizeof(ultrasonic_buffer));
@@ -67,24 +68,21 @@ void I2C_Manager::init() {
         exit(-3);
     }
 
-    // initialize arduino i2c device struct
-    std::memset(&arduino, 0, sizeof(arduino));
-    i2c_init_device(&arduino);
-    arduino.bus = bus_fd;
-    arduino.addr = I2C_Manager::ARDUINO_ADDR & 0x7f;
-    arduino.iaddr_bytes = 0;
-    
-    // initialize imu i2c device struct
-    std::memset(&imu, 0, sizeof(imu));
-    i2c_init_device(&imu);
-    imu.bus = bus_fd;
-    imu.addr = I2C_Manager::IMU_ADDR & 0x7f;
-    imu.iaddr_bytes = 0;
+    // initialize device structs
+    init_device(arduino, addr::ARDUINO, 0);
+    init_device(imu, addr::imu::DEVICE, 1);
 
     // print i2c device descriptions
     char i2c_dev_desc[128];
-    ROS_INFO_STREAM("Arduino: " << i2c_get_device_desc(&arduino, i2c_dev_desc, sizeof(i2c_dev_desc)) << std::endl);
-    ROS_INFO_STREAM("IMU: " << i2c_get_device_desc(&imu, i2c_dev_desc, sizeof(i2c_dev_desc)) << std::endl);
+    ROS_INFO_STREAM("Arduino: " << i2c_get_device_desc(&arduino, i2c_dev_desc, sizeof(i2c_dev_desc)));
+    ROS_INFO_STREAM("IMU: " << i2c_get_device_desc(&imu, i2c_dev_desc, sizeof(i2c_dev_desc)));
+
+    // reset the imu and disable the temperature sensor
+    configure_imu(addr::imu::internal::RESET, 0b10001000);
+    // set the accelerometer scale to +- 4g
+    configure_imu(addr::imu::internal::ACCEL_CONFIG, 0b00010000);
+    // set the gyro scale to 250 deg/s
+    configure_imu(addr::imu::internal::GYRO_CONFIG, 0b00000000);
 
     // unblock the device_reader thread now that the i2c bus is initialized
     data_available.clear(std::memory_order_seq_cst);
@@ -101,37 +99,74 @@ void I2C_Manager::timer_callback(const ros::TimerEvent&) {
         ros::spin();
     }
 
-    // publish data on respective topic
+    // publish ultrasonic data on respective topic
     std_msgs::Float32 distance;
     for (size_t i = 0; i < NUM_ULTRASONICS; ++i) {
         distance.data = ultrasonic_buffer[i];
-        publishers[i].publish(distance);
+        ultrasonic_publishers[i].publish(distance);
     }
+
+    // publish imu data
+    // TODO: construct message and publish
+    // get pitch/roll
+    const std::pair<double, double> angle = std::apply(
+        std::bind_front(&I2C_Manager::get_angle, this), imu_accel
+    );
+    std_msgs::Float32 imu_msg;
+    imu_msg.data = angle.first;
+    imu_publisher.publish(imu_msg);
+
+    // print data
+    std::cout << "Angle: Pitch = " << angle.first << " | Roll = " << angle.second << std::endl;
+    std::cout << "Accelerometer: X = " << std::get<0>(imu_accel) << " | Y = " << std::get<1>(imu_accel) << " | Z = " << std::get<2>(imu_accel) << std::endl;
+    std::cout << "Gyroscope: X = " << std::get<0>(imu_gyro) << " | Y = " << std::get<1>(imu_gyro) << " | Z = " << std::get<2>(imu_gyro) << std::endl;
 
     // consumed the data, no longer available
     data_available.clear();
     data_available.notify_one();
 }
 
-void I2C_Manager::read_devices() {
+void I2C_Manager::get_data() {
     while (!stopped.test()) {
         // wait until the node has published the data before making another request to the hardware
         data_available.wait(true, std::memory_order_seq_cst);
 
-        size_t i = 0;
-        ssize_t ret = 0;
-
-        ret = i2c_ioctl_read(&arduino, 0, ultrasonic_buffer, sizeof(ultrasonic_buffer));
-        if (ret == -1 || (size_t)ret != sizeof(ultrasonic_buffer)) {
-            ROS_ERROR("Read i2c error!\n");
-            continue;
+        // read ultrasonic data
+        if (!read_device(arduino, 0, ultrasonic_buffer)) {
+            ROS_ERROR("i2c error when reading ultrasonics!\n");
         }
 
-        std::cout << "Got data:" << std::endl;
-        for (size_t i = 0; i < 2; ++i) {
-            std::cout << ultrasonic_buffer[i] << " ";
+        // read imu acceleration 
+        if (!read_device(imu, addr::imu::internal::ACCEL, imu_buffer)) {
+            ROS_ERROR("i2c error when reading imu acceleration!\n");
         }
-        std::cout << std::endl;
+        imu_accel = std::make_tuple(
+            imu_buffer[0] + imu_corrections::ACCEL_X,
+            imu_buffer[1] + imu_corrections::ACCEL_Y,
+            imu_buffer[2] + imu_corrections::ACCEL_Z
+        );
+
+        // read imu gyro
+        if (!read_device(imu, addr::imu::internal::GYRO, imu_buffer)) {
+            ROS_ERROR("i2c error when reading imu gyro!\n");
+        }
+        imu_gyro = std::make_tuple(
+            imu_buffer[0] + imu_corrections::GYRO_X,
+            imu_buffer[1] + imu_corrections::GYRO_Y,
+            imu_buffer[2] + imu_corrections::GYRO_Z
+        );
+
+        // std::cout << "Got ultrasonic data:" << std::endl;
+        // for (size_t i = 0; i < NUM_ULTRASONICS; ++i) {
+        //     std::cout << ultrasonic_buffer[i] << " ";
+        // }
+        // std::cout << std::endl;
+
+        // std::cout << "Got imu data:" << std::endl;
+        // for (size_t i = 0; i < NUM_IMU_READINGS; ++i) {
+        //     std::cout << imu_buffer[i] << " ";
+        // }
+        // std::cout << std::endl;
 
         // sleep at half the rate of the timer 
         // this way, data is available whenever the timer callback is ready
@@ -140,6 +175,37 @@ void I2C_Manager::read_devices() {
         bool data_was_available = data_available.test_and_set(std::memory_order_seq_cst);
         assert(data_was_available == false);
     }
+}
+
+void I2C_Manager::init_device(I2CDevice &device, unsigned short address, unsigned int iaddr_bytes) {
+    assert(bus_fd != -1);
+    
+    std::memset(&device, 0, sizeof(device));
+    i2c_init_device(&device);
+    device.bus = bus_fd;
+    device.addr = address & 0x7f;
+    device.iaddr_bytes = iaddr_bytes;
+}
+
+inline bool I2C_Manager::read_device(const I2CDevice &device, unsigned int iaddr, void *buf) {
+    ssize_t ret = i2c_ioctl_read(&device, iaddr, buf, sizeof(buf));
+    return (ret != -1 && (size_t)ret == sizeof(buf));
+}
+
+bool I2C_Manager::configure_imu(unsigned int iaddr, int8_t val) {
+    int8_t buf[1] = {val};
+    ssize_t ret = i2c_ioctl_write(&imu, iaddr, buf, sizeof(buf));
+    if (ret == -1 || (size_t)ret != sizeof(buf)) {
+        ROS_FATAL("i2c error when configuring imu!\n");
+        return false;
+    }
+    return true;
+}
+
+inline std::pair<double, double> I2C_Manager::get_angle(const int16_t x, const int16_t y, const int16_t z) const {
+    const double pitch = atan(x/sqrt((y*y) + (z*z))) * (180.0/M_PI);
+    const double roll = atan(y/sqrt((x*x) + (z*z))) * (180.0/M_PI);
+    return std::make_pair(pitch, roll);
 }
 
 }
