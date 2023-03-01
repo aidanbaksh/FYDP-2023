@@ -75,10 +75,8 @@ void loop() {
     ultrasonic_distances[i] = duration * SPEED_OF_SOUND / 2;
 
     // TODO: remove me
-    Serial.print("Sensor " + String(i) + ": ");
-    Serial.println(ultrasonic_distances[i]);
-
-    delay(100);
+    // Serial.print("Sensor " + String(i) + ": ");
+    // Serial.println(ultrasonic_distances[i]);
   }
 }
 
