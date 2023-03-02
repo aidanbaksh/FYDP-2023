@@ -1,0 +1,6 @@
+<launch>
+  <node pkg="ultrasonic_detectors" type="ultrasonic_obj_detector.py" name="front_ultra" output="screen">
+    <param name="input_path" value="/ultrasonics/left"/>
+    <param name="output_path" value="/ultrasonics/left/object"/>
+  </node>
+</launch>
