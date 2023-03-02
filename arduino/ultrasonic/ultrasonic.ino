@@ -1,5 +1,7 @@
 #include <Wire.h> // I2C
 
+constexpr bool DEBUG = false;
+
 constexpr uint8_t I2C_ADDR = 0x10;
 
 constexpr unsigned int TRIGGER = 2;
@@ -21,7 +23,10 @@ void setup() {
   // start i2c communication as slave
   Wire.begin(I2C_ADDR);
   Wire.onRequest(handle_i2c_request); // register event
-  Serial.begin(9600); // TODO: remove me
+
+  if constexpr (DEBUG) {
+    Serial.begin(9600);
+  }
 }
 
 struct PulseInfo {
@@ -74,26 +79,14 @@ void loop() {
     // divide by 2 since sound wave has to travel out and back
     ultrasonic_distances[i] = duration * SPEED_OF_SOUND / 2;
 
-    // TODO: remove me
-    // Serial.print("Sensor " + String(i) + ": ");
-    // Serial.println(ultrasonic_distances[i]);
+    if constexpr (DEBUG) {
+      Serial.print("Sensor " + String(i) + ": ");
+      Serial.println(ultrasonic_distances[i]);
+    }
   }
 }
 
-#include <assert.h>
-
-constexpr unsigned int REQUEST_ULTRASONICS = 1;
-
 void handle_i2c_request() {
-  // Serial.println("Got i2c request!");
-
-  // Serial.print("Sending back: ");
-  // for (size_t i = 0; i < NUM_ULTRASONICS; ++i) {
-  //   Serial.print(ultrasonic_distances[i]);
-  //   Serial.print(" ");
-  // }
-  // Serial.println();
-
   // send distances over i2c
   Wire.write(
     (const char*)(&ultrasonic_distances),
