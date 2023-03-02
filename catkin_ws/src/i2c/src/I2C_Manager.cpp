@@ -62,6 +62,7 @@ void I2C_Manager::init() {
         ROS_FATAL_STREAM("Error opening i2c bus " << I2C_Manager::BUS_NAME << std::endl);
         exit(-3);
     }
+    ROS_INFO("Opened I2C Bus!");
 
     // initialize device structs
     init_device(arduino, addr::arduino::DEVICE, 0);
@@ -77,8 +78,10 @@ void I2C_Manager::init() {
 
     // reset the imu and disable the temperature sensor
     configure_imu(addr::imu::internal::PWR_MGMT_1, 0b10001000);
+    ros::Duration(0.1).sleep(); // sleep for 100ms
     // reset individual sensors and initialize serial interface
     configure_imu(addr::imu::internal::SIGNAL_PATH_RESET, 0b00000111);
+    ros::Duration(0.1).sleep(); // sleep for 100ms
     // set sample rate divisor, converts clock rate into measurement rate
     // TODO: this will depend on our clock rate
     configure_imu(addr::imu::internal::SMPRT_DIV, 0);
@@ -93,9 +96,10 @@ void I2C_Manager::init() {
     // set the accelerometer scale to +- 2g
     configure_imu(addr::imu::internal::ACCEL_CONFIG, 0b00000000);
     // set clock config to PLL with Gyro X reference
-    configure_imu(addr::imu::internal::PWR_MGMT_1, 0b00000001);
-
+    configure_imu(addr::imu::internal::PWR_MGMT_1, 0b00001001);
     ros::Duration(0.1).sleep(); // sleep for 100ms
+
+    ROS_INFO("Configured IMU!");
 
     // setup publish callback now that timer
     timer = nh.createTimer(
@@ -155,37 +159,37 @@ void I2C_Manager::get_data() {
             ROS_ERROR("i2c error when reading ultrasonics!\n");
         }
 
-        // read imu acceleration 
-        if (!read_device(imu, addr::imu::internal::ACCEL_OUT, imu_buffer)) {
-            ROS_ERROR("i2c error when reading imu acceleration!\n");
-        }
-        imu_accel = std::make_tuple(
-            double(imu_buffer[0] << 8 | imu_buffer[1]) / imu_corrections::ACCEL_SCALE * imu_corrections::SENSORS_GRAVITY_STANDARD,
-            double(imu_buffer[2] << 8 | imu_buffer[3]) / imu_corrections::ACCEL_SCALE * imu_corrections::SENSORS_GRAVITY_STANDARD,
-            double(imu_buffer[4] << 8 | imu_buffer[5]) / imu_corrections::ACCEL_SCALE * imu_corrections::SENSORS_GRAVITY_STANDARD
-        );
+        // // read imu acceleration 
+        // if (!read_device(imu, addr::imu::internal::ACCEL_OUT, imu_buffer)) {
+        //     ROS_ERROR("i2c error when reading imu acceleration!\n");
+        // }
+        // imu_accel = std::make_tuple(
+        //     double(imu_buffer[0] << 8 | imu_buffer[1]) / imu_corrections::ACCEL_SCALE * imu_corrections::SENSORS_GRAVITY_STANDARD,
+        //     double(imu_buffer[2] << 8 | imu_buffer[3]) / imu_corrections::ACCEL_SCALE * imu_corrections::SENSORS_GRAVITY_STANDARD,
+        //     double(imu_buffer[4] << 8 | imu_buffer[5]) / imu_corrections::ACCEL_SCALE * imu_corrections::SENSORS_GRAVITY_STANDARD
+        // );
 
-        // read imu gyro
-        if (!read_device(imu, addr::imu::internal::GYRO_OUT, imu_buffer)) {
-            ROS_ERROR("i2c error when reading imu gyro!\n");
-        }
-        imu_gyro = std::make_tuple(
-            (imu_buffer[0] << 8 | imu_buffer[1]) / imu_corrections::GYRO_SCALE * imu_corrections::SENSORS_DPS_TO_RADS,
-            (imu_buffer[2] << 8 | imu_buffer[3]) / imu_corrections::GYRO_SCALE * imu_corrections::SENSORS_DPS_TO_RADS,
-            (imu_buffer[4] << 8 | imu_buffer[5]) / imu_corrections::GYRO_SCALE * imu_corrections::SENSORS_DPS_TO_RADS
-        );
+        // // read imu gyro
+        // if (!read_device(imu, addr::imu::internal::GYRO_OUT, imu_buffer)) {
+        //     ROS_ERROR("i2c error when reading imu gyro!\n");
+        // }
+        // imu_gyro = std::make_tuple(
+        //     (imu_buffer[0] << 8 | imu_buffer[1]) / imu_corrections::GYRO_SCALE * imu_corrections::SENSORS_DPS_TO_RADS,
+        //     (imu_buffer[2] << 8 | imu_buffer[3]) / imu_corrections::GYRO_SCALE * imu_corrections::SENSORS_DPS_TO_RADS,
+        //     (imu_buffer[4] << 8 | imu_buffer[5]) / imu_corrections::GYRO_SCALE * imu_corrections::SENSORS_DPS_TO_RADS
+        // );
 
-        std::cout
-            << std::fixed
-            << std::setprecision(2)
-            << "IMU: ("
-            << std::get<0>(imu_accel) << ", "
-            << std::get<1>(imu_accel) << ", "
-            << std::get<2>(imu_accel) << ")\t\tGyro: ("
-            << std::get<0>(imu_gyro) << ", "
-            << std::get<1>(imu_gyro) << ", "
-            << std::get<2>(imu_gyro) << ")"
-            << std::endl;
+        // std::cout
+        //     << std::fixed
+        //     << std::setprecision(2)
+        //     << "IMU: ("
+        //     << std::get<0>(imu_accel) << ", "
+        //     << std::get<1>(imu_accel) << ", "
+        //     << std::get<2>(imu_accel) << ")\t\tGyro: ("
+        //     << std::get<0>(imu_gyro) << ", "
+        //     << std::get<1>(imu_gyro) << ", "
+        //     << std::get<2>(imu_gyro) << ")"
+        //     << std::endl;
 
         // std::cout << "Got ultrasonic data:" << std::endl;
         // for (size_t i = 0; i < NUM_ULTRASONICS; ++i) {
