@@ -11,6 +11,10 @@ import tf2_ros
 
 from std_msgs.msg import Float32
 from geometry_msgs.msg import TransformStamped
+from sensor_msgs.msg import PointCloud2
+import sensor_msgs.point_cloud2 as pc2
+
+import pyransac3d as pyrsc
 
 from lidar_merge import constants
 
@@ -48,44 +52,137 @@ class Calibration:
     FRONT_MOUNT_Z_OFFSET_GUESS: float = 0.05  # 5cm 
 
     # back lidar mount can only pitch
-    BACK_MOUNT_PITCH_GUESS: float = 30
+    BACK_MOUNT_PITCH_GUESS: float = 20
+    BACK_MOUNT_HEIGHT_GUESS: float = 25
 
-    NUM_DISTANCE_READINGS: int = 100
+    MAX_NUM_BACK_ULTRASONIC_READINGS: int = 50
+    MIN_NUM_BACK_LIDAR_READINGS: int = 30
 
     def __init__(self):
         rospy.init_node('lidar_merge_calibration')
 
         # initialize back distance subscriber
-        self._back_distance_subscriber = rospy.Subscriber(
-            '/ultrasonics/back_housing', Float32, self._ultrasonic_reading_callback
+        # TODO: change ultrasonic topic
+        self._back_ultrasonic_subscriber = rospy.Subscriber(
+            '/ultrasonics/left', Float32, self._ultrasonic_reading_callback
         )
         # keep track of readings from back ultrasonic
-        self._back_distance_readings = collections.deque([], Calibration.NUM_DISTANCE_READINGS)
+        self._back_ultrasonic_distances = collections.deque([], Calibration.MAX_NUM_BACK_ULTRASONIC_READINGS)
+
+        # initialize back lidar subscriber
+        self._back_lidar2d_subscriber = rospy.Subscriber(
+            '/scan_2D_1', PointCloud2, self._back_lidar2d_callback
+        )
+         # keep track of distances from back lidar
+        self._back_lidar_distances = collections.deque([], Calibration.MIN_NUM_BACK_LIDAR_READINGS)
+
+        # will be initialized later when needed
+        self._back_lidar3d_subscriber = None
+        self._back_lidar_points = None
 
         # publisher of calibrated transforms
         self._tf_publisher = tf2_ros.StaticTransformBroadcaster()
 
     """Records an ultrasonic reading for a given sensor in self._housing_distance_readings"""
     def _ultrasonic_reading_callback(self, msg: Float32) -> None:
-        self._back_distance_readings.appendLeft(float(msg))
+        self._back_ultrasonic_distances.appendleft(msg.data)
+
+    def _position_to_distance(self, point: Tuple[float, float, float]) -> float:
+        return np.sqrt(point[0]**2 + point[1]**2 + point[2]**2)
+
+    """Records an ultrasonic reading for a given sensor in self._back_lidar_distances"""
+    def _back_lidar2d_callback(self, msg: PointCloud2) -> None:
+        # read pointclud msg        
+        points = pc2.read_points(msg, skip_nans=True, field_names=('x', 'y', 'z'))
+        # convert points to distances
+        distances = np.fromiter([self._position_to_distance(pt) for pt in points], np.float64)
+        # remove outliers from pointcloud
+        q1, q3 = np.percentile(distances, [25, 75])
+        iqr = q3 - q1
+        to_keep = (q1 - 1.5*iqr <= distances) & (distances <= q3 + 1.5*iqr)
+        distances = np.sort(distances[to_keep])
+
+        # center distance will be min distance
+        # print(len(distances))
+        center_dist = np.mean(distances[0:min(10, len(distances))])
+        self._back_lidar_distances.appendleft(center_dist)
+
+    """Records an ultrasonic reading for a given sensor in self._back_lidar_distances"""
+    def _back_lidar3d_callback(self, msg: PointCloud2) -> None:
+        # read pointclud msg        
+        self._back_lidar_points = pc2.read_points(msg, skip_nans=True, field_names=('x', 'y', 'z'))
+
+    """Corrects 2D lidar distance measurement using fit model"""
+    def _lidar_distance_offset(self, lidar_distance: float) -> float:
+        return 0.1629 * lidar_distance + 1.8676
 
     """Performs the calibration"""
     def run(self) -> None:
-        rospy.loginfo("Starting calibration")
-        # # wait until we have enough distance measurements from back ultrasonic before proceeding
-        # while len(self._back_distance_readings) < self._back_distance_readings.maxlen:
-        #     rospy.spin()
+        rospy.loginfo("Starting calibration...")
 
-        # delete ultrasonic distance subscriptions as they are no longer needed
-        self._back_distance_subscriber.unregister()
-        self._back_distance_subscriber = None
+        wait_for_back_data = rospy.Rate(10)  # 10 Hz
 
-        # # calculate average distance
-        # back_ultrasonic_dist = np.mean(self._back_distance_readings)
+        # wait until we have enough lidar readings before proceeding
+        # no explicit requirement on ultrasonics, just a max number since they have a faster sample rate
+        while len(self._back_lidar_distances) < self._back_lidar_distances.maxlen:
+            rospy.loginfo("Got %d lidar measurements.", len(self._back_lidar_distances))
+            wait_for_back_data.sleep()
 
-        # get centroid of back lidar readings
+        # delete back ultrasonic and lidar subscriptions as they are no longer needed
+        self._back_ultrasonic_subscriber.unregister()
+        self._back_ultrasonic_subscriber = None
+        self._back_lidar2d_subscriber.unregister()
+        self._back_lidar2d_subscriber = None
 
-        # can solve for back sensor pitch and distance to ground plane
+        # calculate average distance
+        back_ultrasonic_dist = float(np.mean(self._back_ultrasonic_distances))
+        back_lidar_dist = float(np.mean(self._back_lidar_distances)) * 100  # convert from m to cm
+
+        # add calculated correction factor to lidar distance
+        back_lidar_dist += self._lidar_distance_offset(back_lidar_dist)
+
+        print('All ultrasonics', self._back_ultrasonic_distances)
+
+        # print measured distances
+        rospy.loginfo("Back Ultrasonic Distance (cm): %f", back_ultrasonic_dist)
+        rospy.loginfo("Back Lidar Distance (cm): %f", back_lidar_dist)
+
+        # add offsets to intersection point
+        back_ultrasonic_dist += constants.LIDAR_MOUNT_ULTRASONIC_TO_INTERSECTION
+        back_lidar_dist += constants.LIDAR_MOUNT_LIDAR_TO_INTERSECTION
+
+        # compute angle and distance to ground
+        def back_angle_and_height(x: Tuple[float, float]) -> np.ndarray:
+            alpha, h = x
+            return (
+                h/back_ultrasonic_dist - np.cos(np.deg2rad(alpha)),
+                h/back_lidar_dist - np.cos(np.deg2rad(constants.BACK_MOUNT_LIDAR_ULTRASONIC_ANGLE))
+            )
+        alpha, back_mount_height = scipy.optimize.fsolve(
+            back_angle_and_height,
+            (Calibration.BACK_MOUNT_PITCH_GUESS, Calibration.BACK_MOUNT_HEIGHT_GUESS)
+        )
+        back_mount_pitch = alpha + constants.BACK_MOUNT_LIDAR_ULTRASONIC_ANGLE
+
+        rospy.loginfo('Back Pitch Angle (deg): %f', back_mount_pitch)
+        rospy.loginfo('Back Height (cm): %f', back_mount_height)
+
+        # subscribe to 3d pointcloud from back lidar
+        self._back_lidar3d_subscriber = rospy.Subscriber(
+            '/scan_3D_1', PointCloud2, self._back_lidar2d_callback
+        )
+        # wait for reading from back lidar
+        while self._back_lidar_points is None:
+            wait_for_back_data.sleep()
+        # delete lidar 3d subscriptions as it is no longer needed
+        self._back_lidar3d_subscriber.unregister()
+        self._back_lidar3d_subscriber = None
+
+        # extract ground plane from back lidar
+        back_plane_eqn, _ = pyrsc.Plane().fit(self._back_lidar_points, 0.01)
+
+        print('Back plane:', back_plane_eqn)
+        rospy.loginfo('Ground Plane (from back lidar): [%f, %f, %f, %f]', *back_plane_eqn)
 
         # calculate distance to ground plane of each lidar
         
