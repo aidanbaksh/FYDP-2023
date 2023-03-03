@@ -7,6 +7,7 @@ import rospy
 from std_msgs.msg import Float32, Bool
 from sound_play.libsoundplay import SoundClient
 from sound_play.msg import SoundRequest
+from audio_feedback.msg import AudioWarning
 
 
 class HazardType(Enum):
@@ -45,7 +46,7 @@ class SoundManager:
 
         # subscribe to the audio_warnings topic
         self._audio_warning_subscriber = rospy.Subscriber(
-            '/audio_warnings', Float32, self._audio_warning_callback
+            '/audio_warnings', AudioWarning, self._audio_warning_callback
         )
 
         self._sound_handle = SoundClient(blocking=True)
@@ -54,10 +55,10 @@ class SoundManager:
         self._last_played_dict = {}
         self._sev_time_delays = {Severity.LOW: 10, Severity.MEDIUM: 5, Severity.HIGH: 0}
     
-    def _audio_warning_callback(self, msg: Float32) -> None:
-        h_type = 0
-        dir = 0
-        sev = 0
+    def _audio_warning_callback(self, msg: AudioWarning) -> None:
+        h_type = msg.warning_type
+        dir = msg.direction
+        sev = msg.severity
         if HazardType.has_value(h_type):
             h_type = HazardType(h_type)
         else:
