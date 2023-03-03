@@ -1,3 +1,3 @@
-int warning_type
-int direction
-int severity
+int32 warning_type
+int32 direction
+int32 severity
