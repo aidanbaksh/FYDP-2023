@@ -1,4 +1,5 @@
 import collections
+import itertools
 from typing import Tuple
 
 import numpy as np
@@ -19,7 +20,8 @@ import pyransac3d as pyrsc
 from lidar_merge import constants
 
 
-# the base frame is the IMU frame which is assumed to be at the COG of the wheelchair
+# the base frame is the COG of the wheelchair (name of frame is wheelchair)
+# the COG of the wheelchair is assumed to be at the IMU
 # x axis of wheelchair is forward backwards
 # y axis of wheelchair is parallel to the axel of the wheels
 # z axis of wheelchair is up
@@ -29,24 +31,18 @@ from lidar_merge import constants
 #   2. have the same x offset
 #   3. have the same z offset
 
-# the front lidar mount is free to move in pitch and yaw
-# from the top view: CCW yaw is +ve
-# from the side view: downward pitch is +ve
-
 # enforce constraints the back lidar is:
 #   1. along the x axis
 #   2. only has a pitch angle (no yaw)
 
 
-# TODO: make an action server
 class Calibration:
     # this value is set by the technician / installer
     FRONT_MOUNT_X_OFFSET_GUESS: float = 0.6  # approx 2ft
 
     # lidar initial guess are (pitch, yaw)
-    FRONT_LEFT_MOUNT_GUESS: Tuple[float] = (40, 10)
-    FRONT_RIGHT_MOUNT_GUESS: Tuple[float] = (40, -10)
-    FRONT_POST_ANGLE_GUESS: float = -30
+    FRONT_LEFT_MOUNT_GUESS: Tuple[float] = (25, -10)
+    FRONT_RIGHT_MOUNT_GUESS: Tuple[float] = (25, 10)
 
     FRONT_MOUNT_Y_OFFSET_GUESS: float = 0.2  # 20cm
     FRONT_MOUNT_Z_OFFSET_GUESS: float = 0.05  # 5cm 
@@ -56,7 +52,7 @@ class Calibration:
     BACK_MOUNT_HEIGHT_GUESS: float = 25
 
     MAX_NUM_BACK_ULTRASONIC_READINGS: int = 50
-    MIN_NUM_BACK_LIDAR_READINGS: int = 30
+    MIN_NUM_BACK_LIDAR_READINGS: int = 5
 
     def __init__(self):
         rospy.init_node('lidar_merge_calibration')
@@ -64,14 +60,14 @@ class Calibration:
         # initialize back distance subscriber
         # TODO: change ultrasonic topic
         self._back_ultrasonic_subscriber = rospy.Subscriber(
-            '/ultrasonics/left', Float32, self._ultrasonic_reading_callback
+            constants.BACK_ULTRASONIC_TOPIC, Float32, self._ultrasonic_reading_callback
         )
         # keep track of readings from back ultrasonic
         self._back_ultrasonic_distances = collections.deque([], Calibration.MAX_NUM_BACK_ULTRASONIC_READINGS)
 
         # initialize back lidar subscriber
         self._back_lidar2d_subscriber = rospy.Subscriber(
-            '/scan_2D_1', PointCloud2, self._back_lidar2d_callback
+            constants.BACK_LIDAR_2D_TOPIC, PointCloud2, self._back_lidar2d_callback
         )
          # keep track of distances from back lidar
         self._back_lidar_distances = collections.deque([], Calibration.MIN_NUM_BACK_LIDAR_READINGS)
@@ -110,11 +106,23 @@ class Calibration:
     """Records an ultrasonic reading for a given sensor in self._back_lidar_distances"""
     def _back_lidar3d_callback(self, msg: PointCloud2) -> None:
         # read pointclud msg        
-        self._back_lidar_points = pc2.read_points(msg, skip_nans=True, field_names=('x', 'y', 'z'))
+        points_gen = pc2.read_points(msg, skip_nans=True, field_names=('x', 'y', 'z'))
+
+        # clone the generator to get its length
+        points_gen, it = itertools.tee(points_gen)
+        n_points = sum(1 for _ in it)
+
+        # read points as 1d array then reshape to Nx3
+        flattened_pts = itertools.chain.from_iterable(points_gen)
+        pts_1d = np.fromiter(flattened_pts, np.float64)
+        self._back_lidar_points = pts_1d.reshape(n_points, 3)
+
+        # only keep points which have x coordinate greater than 5cm
+        self._back_lidar_points = self._back_lidar_points[self._back_lidar_points[:,0] >= 0.05]
 
     """Corrects 2D lidar distance measurement using fit model"""
     def _lidar_distance_offset(self, lidar_distance: float) -> float:
-        return 0.1629 * lidar_distance + 1.8676
+        return 0.1629 * lidar_distance + 1.8676 + (constants.BACK_MOUNT_LIDAR_TO_FRONT_CM / 100)
 
     """Performs the calibration"""
     def run(self) -> None:
@@ -141,15 +149,13 @@ class Calibration:
         # add calculated correction factor to lidar distance
         back_lidar_dist += self._lidar_distance_offset(back_lidar_dist)
 
-        print('All ultrasonics', self._back_ultrasonic_distances)
-
         # print measured distances
         rospy.loginfo("Back Ultrasonic Distance (cm): %f", back_ultrasonic_dist)
         rospy.loginfo("Back Lidar Distance (cm): %f", back_lidar_dist)
 
         # add offsets to intersection point
-        back_ultrasonic_dist += constants.LIDAR_MOUNT_ULTRASONIC_TO_INTERSECTION
-        back_lidar_dist += constants.LIDAR_MOUNT_LIDAR_TO_INTERSECTION
+        back_ultrasonic_dist += constants.BACK_MOUNT_ULTRASONIC_TO_INTERSECTION_CM
+        back_lidar_dist += constants.BACK_MOUNT_LIDAR_TO_INTERSECTION_CM
 
         # compute angle and distance to ground
         def back_angle_and_height(x: Tuple[float, float]) -> np.ndarray:
@@ -158,18 +164,50 @@ class Calibration:
                 h/back_ultrasonic_dist - np.cos(np.deg2rad(alpha)),
                 h/back_lidar_dist - np.cos(np.deg2rad(constants.BACK_MOUNT_LIDAR_ULTRASONIC_ANGLE))
             )
-        alpha, back_mount_height = scipy.optimize.fsolve(
+        alpha, sensor_intersection_height = scipy.optimize.fsolve(
             back_angle_and_height,
             (Calibration.BACK_MOUNT_PITCH_GUESS, Calibration.BACK_MOUNT_HEIGHT_GUESS)
         )
-        back_mount_pitch = alpha + constants.BACK_MOUNT_LIDAR_ULTRASONIC_ANGLE
+        back_lidar_pitch = alpha + constants.BACK_MOUNT_LIDAR_ULTRASONIC_ANGLE
 
-        rospy.loginfo('Back Pitch Angle (deg): %f', back_mount_pitch)
-        rospy.loginfo('Back Height (cm): %f', back_mount_height)
+        rospy.loginfo('Back Pitch Angle (deg): %f', back_lidar_pitch)
+        rospy.loginfo('Sensor Intersection Height (cm): %f', sensor_intersection_height)
+
+        back_pivot_to_lidar_z_offset = constants.BACK_MOUNT_PIVOT_TO_LIDAR_DIST_CM*np.cos(
+            np.radians(constants.BACK_MOUNT_PIVOT_TO_LIDAR_ANGLE + back_lidar_pitch)
+        )  # should be generally positive
+        back_pivot_to_lidar_x_offset = constants.BACK_MOUNT_PIVOT_TO_LIDAR_DIST_CM*np.sin(
+            np.radians(constants.BACK_MOUNT_PIVOT_TO_LIDAR_ANGLE + back_lidar_pitch)
+        )  # should always be negative
+
+        sensor_intersection_to_lidar_z_offset = (
+            -constants.BACK_MOUNT_ULTRASONIC_TO_INTERSECTION_CM*np.cos(np.radians(back_lidar_pitch))
+        ) 
+
+        # convert calibrated height for the back mount from cm to m
+        sensor_intersection_height /= 100
+        back_pivot_to_lidar_z_offset /= 100
+        back_pivot_to_lidar_x_offset /= 100
+        sensor_intersection_to_lidar_z_offset /= 100
+
+        # construct transform for back lidar
+        back_lidar_x_offset = constants.BACK_PIVOT_X_OFFSET + back_pivot_to_lidar_x_offset
+        back_lidar_z_offset = constants.BACK_PIVOT_Z_OFFSET + back_pivot_to_lidar_z_offset
+        back_tf = self._back_lidar_tf_matrix(
+            back_lidar_pitch,
+            np.array([back_lidar_x_offset, 0, back_lidar_z_offset])
+        )
+
+        # calculate height of wheelchair frame from ground plane
+        back_lidar_height = sensor_intersection_height + sensor_intersection_to_lidar_z_offset
+        wheelchair_to_ground_z = back_lidar_height - back_pivot_to_lidar_z_offset - constants.BACK_PIVOT_Z_OFFSET
+
+        rospy.loginfo('Back Lidar Height (cm): %f', back_lidar_height * 100)
+        rospy.loginfo('Wheelchair to Ground Height (cm): %f', wheelchair_to_ground_z * 100)
 
         # subscribe to 3d pointcloud from back lidar
         self._back_lidar3d_subscriber = rospy.Subscriber(
-            '/scan_3D_1', PointCloud2, self._back_lidar2d_callback
+            constants.BACK_LIDAR_3D_TOPIC, PointCloud2, self._back_lidar3d_callback
         )
         # wait for reading from back lidar
         while self._back_lidar_points is None:
@@ -177,6 +215,8 @@ class Calibration:
         # delete lidar 3d subscriptions as it is no longer needed
         self._back_lidar3d_subscriber.unregister()
         self._back_lidar3d_subscriber = None
+
+        print('points:', self._back_lidar_points.shape)
 
         # extract ground plane from back lidar
         back_plane_eqn, _ = pyrsc.Plane().fit(self._back_lidar_points, 0.01)
@@ -193,11 +233,9 @@ class Calibration:
         initial_guess = np.array([
             *Calibration.FRONT_LEFT_MOUNT_GUESS,
             *Calibration.FRONT_RIGHT_MOUNT_GUESS,
-            Calibration.FRONT_POST_ANGLE_GUESS,
             Calibration.FRONT_MOUNT_X_OFFSET_GUESS,
             Calibration.FRONT_MOUNT_Y_OFFSET_GUESS,
             Calibration.FRONT_MOUNT_Z_OFFSET_GUESS,
-            Calibration.BACK_MOUNT_PITCH_GUESS,
         ])
 
         # optimize to find best guess for lidar positions
@@ -210,9 +248,11 @@ class Calibration:
             return  # just give up
 
         # extract transform matrices from solution
-        front_left_tf, front_right_tf, back_tf = self._tfs_from_solution(result.x)
+        front_left_tf, front_right_tf = self._tfs_from_solution(result.x)
+
         # format transforms as geometry_msgs.TransformStamped
         formatted_tfs = []
+        formatted_tfs.append(self._ground_to_wheelchair(wheelchair_to_ground_z))
         formatted_tfs.append(self._format_tf(constants.FRONT_LEFT_FRAME, front_left_tf))
         formatted_tfs.append(self._format_tf(constants.FRONT_RIGHT_FRAME, front_right_tf))
         formatted_tfs.append(self._format_tf(constants.BACK_FRAME, back_tf))
@@ -222,36 +262,30 @@ class Calibration:
         self._tf_publisher.sendTransform(formatted_tfs)
         rospy.loginfo("Published calibrated transforms")
 
-    def _tfs_from_solution(self, x: np.ndarray) -> Tuple[np.ndarray]:
+    def _tfs_from_solution(self, x: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         # extract values from current solution vector
         # NOTE: this should match the initial guesses provided to the solver
         front_left_pitch  = x[0]
         front_left_yaw    = x[1]
         front_right_pitch = x[2]
         front_right_yaw   = x[3]
-        front_post_angle  = x[4]
-        front_x_offset    = x[5]
-        front_y_offset    = x[6]
-        front_z_offset    = x[7]
-        back_pitch        = x[8]
+        front_x_offset    = x[4]
+        front_y_offset    = x[5]
+        front_z_offset    = x[6]
 
         # construct transformation matrices from current solution
         front_left_tf = self._front_lidar_tf_matrix(
-            front_left_pitch, front_left_yaw, front_post_angle,
+            front_left_pitch, front_left_yaw,
             np.array([front_x_offset, front_y_offset, front_z_offset])
         )
         front_right_tf = self._front_lidar_tf_matrix(
-            front_right_pitch, front_right_yaw, front_post_angle,
+            front_right_pitch, front_right_yaw,
             np.array([front_x_offset, -front_y_offset, front_z_offset])
         )
-        back_tf = self._back_lidar_tf_matrix(
-            back_pitch,
-            np.array([constants.BACK_MOUNT_X_OFFSET, 0, constants.BACK_MOUNT_Z_OFFSET])
-        )
-        return (front_left_tf, front_right_tf, back_tf)
+        return (front_left_tf, front_right_tf)
 
     def _compute_cost(self, x: np.ndarray) -> None:
-        front_left_tf, front_right_tf, back_tf = self._tfs_from_solution(x)
+        front_left_tf, front_right_tf = self._tfs_from_solution(x)
 
         # get point cloud as (4, *) array then
         # left_points_global = np.dot(front_left_tf, left_points)
@@ -267,9 +301,8 @@ class Calibration:
         return 1
 
     """Convenience method to generate front lidar transformation matrix"""
-    def _front_lidar_tf_matrix(self, pitch: float, yaw: float, post_angle: float, offset: np.ndarray) -> np.ndarray:
-        global_pitch = post_angle + pitch
-        euler_angles = (global_pitch, yaw, 0)
+    def _front_lidar_tf_matrix(self, pitch: float, yaw: float, offset: np.ndarray) -> np.ndarray:
+        euler_angles = (pitch, yaw, 0)
         # generate rotation matrix from euler angles
         # the order of euler angles is imporant
         # the first adjustment angle is the pitch of the sensor housing, then the yaw
@@ -295,6 +328,21 @@ class Calibration:
         # add translation offset
         T[0:3, 3] = offset
         return T
+
+    def _ground_to_wheelchair(self, wheelchair_z_offset: float) -> TransformStamped:
+        # create message with frame ids
+        t = TransformStamped()
+        t.header.stamp = rospy.Time.now()
+        t.header.frame_id = constants.GROUND_PLANE_FRAME
+        t.child_frame_id = constants.WHEELCHAIR_FRAME
+
+        # wheelchair is directly above ground plane
+        t.transform.translation.z = wheelchair_z_offset
+        # have to set homogenous coordinate otherwise rotation is infinite which does not make sense
+        t.transform.rotation.w = 1
+
+        return t
+
 
     """Convenience method which formats transformation matrix as a TransformStamped"""
     def _format_tf(self, lidar_frame: str, T: np.ndarray) -> TransformStamped:
@@ -322,5 +370,5 @@ class Calibration:
 def run():
     calibration = Calibration()
     calibration.run()
-
-    rospy.spin()
+    
+    # don't spin after calibration is run so node shuts down
