@@ -67,7 +67,7 @@ class I2C_Manager {
     static constexpr unsigned int BUS_NUM = 0;
     inline static const std::string BUS_NAME = "/dev/i2c-" + std::to_string(I2C_Manager::BUS_NUM);
 
-    static constexpr size_t NUM_ULTRASONICS = 2;
+    static constexpr size_t NUM_ULTRASONICS = 1;
     static const std::array<std::string, NUM_ULTRASONICS> ULTRASONIC_TOPICS;
 
     static constexpr size_t NUM_IMU_AXES = 3;

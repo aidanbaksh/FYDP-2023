@@ -10,8 +10,7 @@ namespace i2c_node {
 
 // the ultrasonic topics must be listed in the order the Jetson recieves data
 const std::array<std::string, I2C_Manager::NUM_ULTRASONICS> I2C_Manager::ULTRASONIC_TOPICS = {
-    "/ultrasonics/right",
-    "/ultrasonics/left",
+    "/ultrasonics/back",
 };
 
 I2C_Manager::I2C_Manager(ros::NodeHandle& nh):
@@ -196,10 +195,6 @@ void I2C_Manager::get_data() {
         //     std::cout << ultrasonic_buffer[i] << " ";
         // }
         // std::cout << std::endl;
-
-        // sleep at half the rate of the timer 
-        // this way, data is available whenever the timer callback is ready
-        std::this_thread::sleep_for(std::chrono::milliseconds(I2C_Manager::PUBLISH_INTERVAL_MS/2));
 
         bool data_was_available = data_available.test_and_set(std::memory_order_seq_cst);
         assert(data_was_available == false);
