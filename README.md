@@ -11,10 +11,7 @@ This repository contains the code for the University of Waterloo capstone projec
 
 ## LiDAR Connection
 
-**Back:** right bottom
-
-**Front Left:** right top
-
-**Front Right:** left top
-
-NOTE: the left side of the ports is the HDMI side
+| Ports        | Stack 1                | Stack 2                 |
+| ------------ | ---------------------- | ----------------------- |
+| Display Port | empty (USB 1-2.1)      | Left Lidar (USB 1-2.3)  |
+| HDMI         | Back Lidar (USB 1-2.2) | Right Lidar (USB 1-2.4) |
