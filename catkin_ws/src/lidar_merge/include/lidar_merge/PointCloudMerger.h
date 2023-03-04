@@ -21,9 +21,9 @@ class PointCloudMerger {
         "/scan_3D_2",
     };
     inline static const std::array<std::string, NUM_POINTCLOUDS> POINTCLOUD_FRAMES = {
+        "back_lidar",
         "front_left_lidar",
         "front_right_lidar",
-        "back_lidar",
     };
     inline static const std::string WHEELCHAIR_FRAME = "wheelchair";
 

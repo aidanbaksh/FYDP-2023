@@ -34,7 +34,7 @@ bool PointCloudMerger::get_lidar_transforms(double timeout) {
             ROS_INFO_STREAM("Looking up transform from " << POINTCLOUD_FRAMES[i]
                 << " to " << WHEELCHAIR_FRAME);
             pointcloud_transforms[i] = tf_buffer.lookupTransform(
-                POINTCLOUD_FRAMES[i], WHEELCHAIR_FRAME, ros::Time(0), ros::Duration(timeout)
+                WHEELCHAIR_FRAME, POINTCLOUD_FRAMES[i], ros::Time(0), ros::Duration(timeout)
             );
         } catch (tf2::TransformException &ex) {
             ROS_WARN("%s", ex.what());
