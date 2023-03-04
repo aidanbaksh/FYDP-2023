@@ -83,9 +83,10 @@ class SoundManager:
             return False
         
         self.setPathFromInputs(h_type, dir)
+        self.setMessageFromInputs(h_type, dir)
         if self.checkTimeDelay(sev):
             print("Playing: {}".format(self._request_path)) #Change to warning/log message
-            self._sound_handle.say("Hi! I am working.")
+            self._sound_handle.say(self._request_message)
             self.setLastPlayedTime(self._request_path)
         else:
             # Change to warning/log message
@@ -138,7 +139,35 @@ class SoundManager:
             path += "_front_left"
 
         self._request_path = path
+
+    def setMessageFromInputs(self, h_type: HazardType, dir: Direction) -> None:
+        msg = ""
+
+        if h_type == HazardType.CURB:
+            msg += "Curb "
+        elif h_type == HazardType.OBJECT:
+            msg += "Object "
+        elif h_type == HazardType.TIP:
+            msg += "Tip "
         
+        if dir == Direction.FRONT:
+            msg += "Front"
+        elif dir == Direction.FRONT_RIGHT: 
+            msg += "Front Right"
+        elif dir == Direction.RIGHT: 
+            msg += "Right"
+        elif dir == Direction.BACK_RIGHT: 
+            msg += "Back Right"
+        elif dir == Direction.BACK: 
+            msg += "Back"
+        elif dir == Direction.BACK_LEFT: 
+            msg += "Back Left"
+        elif dir == Direction.LEFT: 
+            msg += "Left"
+        elif dir == Direction.FRONT_LEFT: 
+            msg += "Front Left"
+
+        self._request_message = msg
         
 
 if __name__ == '__main__':
