@@ -1,0 +1,26 @@
+<launch>
+  <!--
+    Delays start of all nodes except RViz. 
+    Basically gives time for RViz to load before starting things
+  -->
+  <arg name="node_start_delay" default="5.0" />
+   
+  <!-- LiDARs -->
+  <include file="$(find cyglidar_d1)/launch/lidar.launch"/>
+
+  <!-- LiDAR Merging -->
+  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find audio_feedback)/launch/config.rviz"/>
+  <node pkg="lidar_merge" type="lidar_merge_node" name="merger" output="screen" launch-prefix="bash -c 'sleep $(arg node_start_delay); $0 $@' "/>
+  <node pkg="lidar_merge" type="publish.py" name="publish_calibrated_transforms" output="screen" launch-prefix="bash -c 'sleep $(arg node_start_delay); $0 $@' "/>
+  
+  <!-- i2c and ultrasonics -->
+  <node pkg="i2c" type="i2c_node" name="i2c_node" output="screen" launch-prefix="bash -c 'sleep $(arg node_start_delay); $0 $@' "/>
+  <include file="$(find ultrasonic_detectors)/launch/object_detectors.launch" launch-prefix="bash -c 'sleep $(arg node_start_delay); $0 $@' "/>
+
+  <!-- LiDAR Detection -->
+  <node pkg="lidar" type="plane_detector" name="plane_detection" output="screen" launch-prefix="bash -c 'sleep $(arg node_start_delay); $0 $@' "/>
+  
+  <!-- aggregator and audio feedback -->
+  <node pkg="audio_common" type="sound_play" name="sound_play"/>
+  <node pkg="audio_feedback" type="aggregator" name="aggregator" output="screen" launch-prefix="bash -c 'sleep $(arg node_start_delay); $0 $@' "/>
+</launch>
