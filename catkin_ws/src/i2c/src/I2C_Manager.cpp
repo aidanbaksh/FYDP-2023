@@ -196,11 +196,11 @@ void I2C_Manager::get_data() {
         //     << std::get<2>(imu_gyro) << ")"
         //     << std::endl;
 
-        std::cout << "Got ultrasonic data:" << std::endl;
-        for (size_t i = 0; i < NUM_ULTRASONICS; ++i) {
-            std::cout << unsigned(ultrasonic_buffer[i]) << " ";
-        }
-        std::cout << std::endl;
+        // std::cout << "Got ultrasonic data:" << std::endl;
+        // for (size_t i = 0; i < NUM_ULTRASONICS; ++i) {
+        //     std::cout << unsigned(ultrasonic_buffer[i]) << " ";
+        // }
+        // std::cout << std::endl;
 
         bool data_was_available = data_available.test_and_set(std::memory_order_seq_cst);
         assert(data_was_available == false);
