@@ -39,9 +39,6 @@ from lidar_merge.constants import LiDAR
 
 
 class Calibration:
-    FRONT_MOUNT_Y_OFFSET_GUESS: float = 0.2  # 20cm
-    FRONT_MOUNT_Z_OFFSET_GUESS: float = 0.05  # 5cm 
-
     # back lidar mount can only pitch
     BACK_MOUNT_PITCH_GUESS: float = 20
     BACK_MOUNT_HEIGHT_GUESS: float = 25
@@ -464,15 +461,15 @@ class Calibration:
         front_left_tf = self._front_lidar_tf_matrix(
             np.array([
                 constants.FRONT_MOUNT_X_OFFSET,
-                Calibration.FRONT_MOUNT_Y_OFFSET_GUESS,
-                Calibration.FRONT_MOUNT_Z_OFFSET_GUESS
+                constants.FRONT_MOUNT_Y_OFFSET,
+                -1  # does not require a guess, calculated by calibration
             ])
         )
         front_right_tf = self._front_lidar_tf_matrix(
             np.array([
                 constants.FRONT_MOUNT_X_OFFSET,
-                -Calibration.FRONT_MOUNT_Y_OFFSET_GUESS,
-                Calibration.FRONT_MOUNT_Z_OFFSET_GUESS
+                -constants.FRONT_MOUNT_Y_OFFSET,
+                -1  # does not require a guess, calculated by calibration
             ])
         )
         return (front_left_tf, front_right_tf)

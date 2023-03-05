@@ -30,7 +30,8 @@ BACK_PIVOT_Z_OFFSET: float = -0.1  # 1cm
 BACK_MOUNT_LIDAR_ULTRASONIC_ANGLE: float = 30
 
 # this value is set by the technician / installer
-FRONT_MOUNT_X_OFFSET: float = 0.6  # approx 2ft
+FRONT_MOUNT_X_OFFSET: float = 0.66  # 66cm
+FRONT_MOUNT_Y_OFFSET: float = 0.415/2  # 41.5cm between housings
 
 # distance from measurement point to intersection of sensors
 BACK_MOUNT_ULTRASONIC_TO_INTERSECTION_CM: float = 6.963
