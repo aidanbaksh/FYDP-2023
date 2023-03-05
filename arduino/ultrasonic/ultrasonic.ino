@@ -1,12 +1,21 @@
 #include <Wire.h> // I2C
+#include <assert.h>
 
 constexpr bool DEBUG = false;
 
 constexpr uint8_t I2C_ADDR = 0x10;
 
-constexpr unsigned int TRIGGER = 2;
-constexpr size_t NUM_ULTRASONICS = 2;
-constexpr unsigned int ECHO[NUM_ULTRASONICS] = {5, 7};
+constexpr size_t NUM_ULTRASONICS = 7;
+constexpr unsigned int TRIGGER = 12;
+constexpr unsigned int ECHO[NUM_ULTRASONICS] = {
+  2, // right side
+  3, // front right housing
+  4, // front right side
+  5, // back
+  6, // front left side
+  7, // front left housing
+  8, // left side
+};
 
 constexpr double SPEED_OF_SOUND = 343.0 * 100 / 1000000; // m/s to cm/s to cm/microsecond
 
@@ -88,8 +97,9 @@ void loop() {
 
 void handle_i2c_request() {
   // send distances over i2c
-  Wire.write(
+  size_t ret = Wire.write(
     (const char*)(&ultrasonic_distances),
     NUM_ULTRASONICS * sizeof(ultrasonic_distances[0])
   );
+  assert(ret == NUM_ULTRASONICS * sizeof(ultrasonic_distances[0]));
 }
