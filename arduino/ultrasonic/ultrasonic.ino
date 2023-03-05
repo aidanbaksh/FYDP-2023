@@ -20,7 +20,7 @@ constexpr unsigned int ECHO[NUM_ULTRASONICS] = {
 constexpr double SPEED_OF_SOUND = 343.0 * 100 / 1000000; // m/s to cm/s to cm/microsecond
 
 // data that is sent over i2c on request
-long ultrasonic_distances[NUM_ULTRASONICS];
+uint8_t ultrasonic_distances[NUM_ULTRASONICS];
 
 void setup() {
   // set mode of trigger and echo pins
@@ -98,7 +98,7 @@ void loop() {
 void handle_i2c_request() {
   // send distances over i2c
   size_t ret = Wire.write(
-    (const char*)(&ultrasonic_distances),
+    (const uint8_t*)(&ultrasonic_distances),
     NUM_ULTRASONICS * sizeof(ultrasonic_distances[0])
   );
   assert(ret == NUM_ULTRASONICS * sizeof(ultrasonic_distances[0]));
