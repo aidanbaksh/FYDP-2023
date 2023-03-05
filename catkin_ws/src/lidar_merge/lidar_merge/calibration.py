@@ -1,7 +1,6 @@
 import collections
-import functools
 import itertools
-from typing import Callable, Optional, Tuple 
+from typing import Callable, Optional, Tuple, List 
 
 import numpy as np
 import scipy.optimize
@@ -47,7 +46,7 @@ class Calibration:
     MIN_NUM_BACK_LIDAR_READINGS: int = 5
 
     def __init__(self):
-        rospy.init_node('lidar_merge_calibration')
+        rospy.init_node('calibrate_lidar_transforms')
 
         # initialize back distance subscriber
         # TODO: change ultrasonic topic
@@ -206,12 +205,8 @@ class Calibration:
         R = np.identity(3) + v_x + (1/(1+c))*v_x@v_x
         return R
 
-    # TODO: remove me!
-    def _compute_cost(self, x: np.ndarray) -> None:
-        return 1
-
     """Performs the calibration"""
-    def run(self) -> None:
+    def run(self) -> List[TransformStamped]:
         rospy.loginfo("Starting calibration...")
 
         # wait until we have enough lidar readings before proceeding
@@ -360,18 +355,6 @@ class Calibration:
         front_left_tf = self._apply_rotation_to_tf(front_left_tf, R_left_wall_plane)
         front_right_tf = self._apply_rotation_to_tf(front_right_tf, R_right_wall_plane)
 
-        # setup initial guess vector
-        # NOTE: this should match how values are extracted in _tfs_from_solution
-
-        # # optimize to find best guess for lidar positions
-        # result = scipy.optimize.minimize(self._compute_cost, initial_guess, options={'maxiter': 1})
-
-        # # handle error if solver failed to converge
-        # if not result.success:
-        #     rospy.logfatal("Calibration failed to converge to a solution!")
-        #     rospy.loginfo("Optimization message: %s", result.message)
-        #     return  # just give up
-
         # format transforms as geometry_msgs.TransformStamped
         formatted_tfs = []
         formatted_tfs.append(self._ground_to_wheelchair(wheelchair_to_ground_z))
@@ -384,71 +367,72 @@ class Calibration:
         self._tf_publisher.sendTransform(formatted_tfs)
         rospy.loginfo("Published calibrated transforms")
 
+        # # debugging !!
+        # from std_msgs.msg import Header
+        # from geometry_msgs.msg import PolygonStamped, Point32
 
-        # debugging !!
-        from std_msgs.msg import Header
-        from geometry_msgs.msg import PolygonStamped, Point32
+        # frames = [
+        #     constants.BACK_FRAME,
+        #     constants.FRONT_LEFT_FRAME,
+        #     constants.FRONT_RIGHT_FRAME,
+        # ]
+        # topic_postfix = [
+        #     'back',
+        #     'front_left',
+        #     'front_right',
+        # ]
+        # lidars = [LiDAR.BACK, LiDAR.LEFT, LiDAR.RIGHT ]
+        # plane_eqs = [back_ground_plane_eqn, left_wall_plane_eqn, right_wall_plane_eqn]
 
-        frames = [
-            constants.BACK_FRAME,
-            constants.FRONT_LEFT_FRAME,
-            constants.FRONT_RIGHT_FRAME,
-        ]
-        topic_postfix = [
-            'back',
-            'front_left',
-            'front_right',
-        ]
-        lidars = [LiDAR.BACK, LiDAR.LEFT, LiDAR.RIGHT ]
-        plane_eqs = [back_ground_plane_eqn, left_wall_plane_eqn, right_wall_plane_eqn]
+        # filt_pubs = []
+        # plane_pubs = []
 
-        filt_pubs = []
-        plane_pubs = []
+        # filts = []
+        # planes = []
 
-        filts = []
-        planes = []
+        # for i, fr in enumerate(frames):
+        #     # filtered points
+        #     filt_topic = '/filtered_' + topic_postfix[i]
+        #     filt_pubs.append(
+        #         rospy.Publisher(filt_topic, PointCloud2, queue_size=1)
+        #     )
 
-        for i, fr in enumerate(frames):
-            # filtered points
-            filt_topic = '/filtered_' + topic_postfix[i]
-            filt_pubs.append(
-                rospy.Publisher(filt_topic, PointCloud2, queue_size=1)
-            )
+        #     h = Header()
+        #     h.stamp = rospy.Time.now()
+        #     h.frame_id = fr
+        #     filts.append(
+        #         pc2.create_cloud_xyz32(h, self.filtered_pts[lidars[i]])
+        #     )
 
-            h = Header()
-            h.stamp = rospy.Time.now()
-            h.frame_id = fr
-            filts.append(
-                pc2.create_cloud_xyz32(h, self.filtered_pts[lidars[i]])
-            )
+        #     # detected ground planes
+        #     plane_topic = '/plane_' + topic_postfix[i]
+        #     plane_pubs.append(
+        #         rospy.Publisher(plane_topic, PolygonStamped, queue_size=5)
+        #     )
 
-            # detected ground planes
-            plane_topic = '/plane_' + topic_postfix[i]
-            plane_pubs.append(
-                rospy.Publisher(plane_topic, PolygonStamped, queue_size=5)
-            )
+        #     p = PolygonStamped()
+        #     p.header.stamp = rospy.Time.now()
+        #     p.header.frame_id = fr
+        #     p.polygon.points = []
+        #     for (y, z) in [(0.1, 0.1), (0.1, -0.1), (-0.1, -0.1), (-0.1, 0.1)]:
+        #         pt = Point32()
+        #         pt.y = y
+        #         pt.z = z
+        #         pt.x = (
+        #             plane_eqs[i][1] * y + plane_eqs[i][2] * z + plane_eqs[i][3]
+        #         ) / -plane_eqs[i][0]
+        #         p.polygon.points.append(pt)
+        #     planes.append(p)
 
-            p = PolygonStamped()
-            p.header.stamp = rospy.Time.now()
-            p.header.frame_id = fr
-            p.polygon.points = []
-            for (y, z) in [(0.1, 0.1), (0.1, -0.1), (-0.1, -0.1), (-0.1, 0.1)]:
-                pt = Point32()
-                pt.y = y
-                pt.z = z
-                pt.x = (
-                    plane_eqs[i][1] * y + plane_eqs[i][2] * z + plane_eqs[i][3]
-                ) / -plane_eqs[i][0]
-                p.polygon.points.append(pt)
-            planes.append(p)
+        # rate = rospy.Rate(1)
+        # while not rospy.is_shutdown():
+        #     for i in range(3):
+        #         plane_pubs[i].publish(planes[i])
+        #         filt_pubs[i].publish(filts[i])
 
-        rate = rospy.Rate(1)
-        while not rospy.is_shutdown():
-            for i in range(3):
-                plane_pubs[i].publish(planes[i])
-                filt_pubs[i].publish(filts[i])
+        #     rate.sleep()
 
-            rate.sleep()
+        return formatted_tfs
 
     def _apply_rotation_to_tf(self, T: np.ndarray, R: np.ndarray) -> np.ndarray:
         assert(T.shape == (4, 4))
@@ -531,8 +515,8 @@ class Calibration:
 
 
 # essentially the main function, called by calibrate script
-def run():
+def run() -> List[TransformStamped]:
     calibration = Calibration()
-    calibration.run()
+    return calibration.run()
     
     # don't spin after calibration is run so node shuts down
