@@ -16,6 +16,10 @@ catkin_python_setup()
 add_message_files(
   FILES
   AudioWarning.msg
+  LidarCurb.msg
+  LidarObject.msg
+  UltrasonicCurb.msg
+  UltrasonicObject.msg
 )
 
 generate_messages(
