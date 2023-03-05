@@ -102,16 +102,52 @@ class Calibration:
         center_dist = np.mean(distances[0:min(10, len(distances))])
         self._back_lidar_distances.appendleft(center_dist)
 
-    def _filter_lidar(self, points: np.ndarray) -> np.ndarray:
-        # only keep points which have x coordinate greater than 5cm
-        return points[
-            (constants.LIDAR_FILTER_X_MIN_THRESHOLD <= points[:,0]) &
-            (points[:,0] <= constants.LIDAR_FILTER_X_MAX_THRESHOLD)
-        ]
+    """Takes a reading from a lidar sensor and finds a ground plane"""
+    def _get_ground_plane(self, lidar: LiDAR) -> np.ndarray:
+
+        def filter_lidar(points: np.ndarray) -> np.ndarray:
+            # only keep points which have x coordinate in bounds
+            return points[
+                (constants.GROUND_PLANE_FILTER_X_MIN_THRESHOLD <= points[:,0]) &
+                (points[:,0] <= constants.GROUND_PLANE_FILTER_X_MAX_THRESHOLD)
+            ]
+
+        ground_plane_eqn = self._get_lidar_plane(lidar, filter_lidar)
+
+        # flip the planes so the normal points up
+        if ground_plane_eqn[3] < 0:
+            ground_plane_eqn = -ground_plane_eqn
+
+        rospy.loginfo('Ground Plane (%s): [%f, %f, %f, %f]', lidar.value, *ground_plane_eqn)
+        return ground_plane_eqn
+
+        """Takes a reading from a lidar sensor and finds a wall plane"""
+    def _get_wall_plane(self, lidar: LiDAR, R_lidar: np.ndarray, lidar_to_ground: float) -> np.ndarray:
+
+        def filter_lidar(points: np.ndarray) -> np.ndarray:
+            # only keep points which have x coordinate in bounds
+            points = points[
+                constants.GROUND_PLANE_FILTER_X_MIN_THRESHOLD <= points[:,0]
+            ]
+
+            points = points@np.linalg.inv(R_lidar)
+            # only keep points which have z coordinate a certain threshold above the ground plane
+            return points[
+                points[:,2] >= (constants.WALL_PLANE_FILTER_MIN_Z_THRESHOLD - lidar_to_ground)
+            ]
+
+        wall_plane_eqn = self._get_lidar_plane(lidar, filter_lidar)
+
+        # flip the planes so it points in the positive x direction
+        if wall_plane_eqn[3] < 0:
+            wall_plane_eqn = -wall_plane_eqn
+
+        rospy.loginfo('Wall Plane (%s): [%f, %f, %f, %f]', lidar.value, *wall_plane_eqn)
+        return wall_plane_eqn
 
     """Takes a reading from a lidar sensor and finds a plane"""
-    def _get_ground_plane(self, lidar: LiDAR,
-        filter_func: Optional[Callable[[np.ndarray],np.ndarray]] = None) -> np.ndarray:
+    def _get_lidar_plane(self, lidar: LiDAR,
+        filter_func: Optional[Callable[[np.ndarray],np.ndarray]]) -> np.ndarray:
 
         lidar3d_points: np.ndarray = None
 
@@ -145,19 +181,13 @@ class Calibration:
         lidar3d_subscriber = None
 
         # filter points
-        lidar3d_points = self._filter_lidar(lidar3d_points)
+        lidar3d_points = filter_func(lidar3d_points)
 
         self.filtered_pts[lidar] = lidar3d_points  # TODO: REMOVE ME!
 
-        plane_eqn, _ = pyrsc.Plane().fit(lidar3d_points, constants.GROUND_PLANE_RANSAC_THRESHOLD)
-        plane_eqn = np.array(plane_eqn)  # convert to np.ndarray
-
-        # flip the planes so the normal points up
-        if plane_eqn[3] < 0:
-            plane_eqn = -plane_eqn
-
-        rospy.loginfo('Ground Plane (%s): [%f, %f, %f, %f]', lidar.value, *plane_eqn)
-        return plane_eqn
+        plane_eqn, _ = pyrsc.Plane().fit(lidar3d_points, constants.PLANE_RANSAC_THRESHOLD)
+        return np.array(plane_eqn)  # convert to np.ndarray
+        
 
     """Gets normal vector from plane equation of the form Ax + Bx + Cx + D = 0"""
     def _get_plane_normal_vector(self, plane_eqn: np.ndarray) -> np.ndarray:
@@ -263,31 +293,31 @@ class Calibration:
         rospy.loginfo('Wheelchair to Ground Height (cm): %f', wheelchair_to_ground_z * 100)
 
         # extract ground planes from each lidar
-        back_plane_eqn = self._get_ground_plane(LiDAR.BACK)
-        left_plane_eqn = self._get_ground_plane(LiDAR.LEFT)
-        right_plane_eqn = self._get_ground_plane(LiDAR.RIGHT)
+        back_ground_plane_eqn = self._get_ground_plane(LiDAR.BACK)
+        left_ground_plane_eqn = self._get_ground_plane(LiDAR.LEFT)
+        right_ground_plane_eqn = self._get_ground_plane(LiDAR.RIGHT)
 
         # find rotation to make ground plane equivalent to xy plane
         e_3 = np.array([0, 0, 1])
 
         # compute plane normals
-        left_plane_normal = self._get_plane_normal_vector(left_plane_eqn)
-        right_plane_normal = self._get_plane_normal_vector(right_plane_eqn)
+        left_ground_plane_normal = self._get_plane_normal_vector(left_ground_plane_eqn)
+        right_ground_plane_normal = self._get_plane_normal_vector(right_ground_plane_eqn)
 
-        R_left_plane = self._rotation_matrix_for_plane(left_plane_normal, e_3)
-        R_right_plane = self._rotation_matrix_for_plane(right_plane_normal, e_3)
+        R_left_ground_plane = self._rotation_matrix_for_plane(left_ground_plane_normal, e_3)
+        R_right_ground_plane = self._rotation_matrix_for_plane(right_ground_plane_normal, e_3)
 
         # build transformation matrices from initial guess
         front_left_tf, front_right_tf = self._front_lidar_tfs_initial_guess()
 
         # apply rotation to align plane
-        front_left_tf = self._apply_rotation_to_tf(front_left_tf, R_left_plane)
-        front_right_tf = self._apply_rotation_to_tf(front_right_tf, R_right_plane)
+        front_left_tf = self._apply_rotation_to_tf(front_left_tf, R_left_ground_plane)
+        front_right_tf = self._apply_rotation_to_tf(front_right_tf, R_right_ground_plane)
 
         # calculate distance to ground plane of each lidar
-        back_plane_height = back_plane_eqn[3]
-        left_plane_height = left_plane_eqn[3]
-        right_plane_height = right_plane_eqn[3]
+        back_plane_height = back_ground_plane_eqn[3]
+        left_plane_height = left_ground_plane_eqn[3]
+        right_plane_height = right_ground_plane_eqn[3]
 
         assert(back_plane_height >= 0)
         assert(left_plane_height >= 0)
@@ -303,6 +333,35 @@ class Calibration:
         rospy.loginfo('Back Z Offset (cm): %f', back_lidar_z_offset * 100)
         rospy.loginfo('Left Z Offset (cm): %f', left_lidar_z_offset * 100)
         rospy.loginfo('Right Z Offset (cm): %f', right_lidar_z_offset * 100)
+
+        # wait for 20 while user reorients wheelchair to detect forward orientation
+        rospy.loginfo('Please reorient the mobility device towards a wall...')
+        rospy.sleep(12)
+        rospy.loginfo('Will continue calibration shortly...')
+        rospy.sleep(3)
+        rospy.loginfo('Continuing calibration...')
+
+        # extract wall planes from each lidar
+        left_wall_plane_eqn = self._get_wall_plane(LiDAR.LEFT, R_left_ground_plane, wheelchair_to_ground_z + left_lidar_z_offset)
+        right_wall_plane_eqn = self._get_wall_plane(LiDAR.RIGHT, R_right_ground_plane, wheelchair_to_ground_z + right_lidar_z_offset)
+
+        # find rotation to make wall plane normal to x axis
+        e_1 = np.array([-1, 0, 0])
+
+        # compute plane normals
+        left_wall_plane_normal = self._get_plane_normal_vector(left_ground_plane_eqn)
+        right_wall_plane_normal = self._get_plane_normal_vector(right_ground_plane_eqn)
+
+        # ignore z components in rotation
+        left_wall_plane_normal[2] = 0
+        right_wall_plane_normal[2] = 0
+
+        R_left_wall_plane = self._rotation_matrix_for_plane(left_wall_plane_normal, e_1)
+        R_right_wall_plane = self._rotation_matrix_for_plane(right_wall_plane_normal, e_1)
+
+        # apply rotation to align plane
+        front_left_tf = self._apply_rotation_to_tf(front_left_tf, R_left_wall_plane)
+        front_right_tf = self._apply_rotation_to_tf(front_right_tf, R_right_wall_plane)
 
         # setup initial guess vector
         # NOTE: this should match how values are extracted in _tfs_from_solution
@@ -344,7 +403,7 @@ class Calibration:
             'front_right',
         ]
         lidars = [LiDAR.BACK, LiDAR.LEFT, LiDAR.RIGHT ]
-        plane_eqs = [back_plane_eqn, left_plane_eqn, right_plane_eqn]
+        plane_eqs = [back_ground_plane_eqn, left_wall_plane_eqn, right_wall_plane_eqn]
 
         filt_pubs = []
         plane_pubs = []
