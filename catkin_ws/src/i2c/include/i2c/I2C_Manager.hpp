@@ -67,7 +67,7 @@ class I2C_Manager {
     static constexpr unsigned int BUS_NUM = 0;
     inline static const std::string BUS_NAME = "/dev/i2c-" + std::to_string(I2C_Manager::BUS_NUM);
 
-    static constexpr size_t NUM_ULTRASONICS = 1;
+    static constexpr size_t NUM_ULTRASONICS = 7;
     static const std::array<std::string, NUM_ULTRASONICS> ULTRASONIC_TOPICS;
 
     static constexpr size_t NUM_IMU_AXES = 3;
@@ -120,7 +120,7 @@ private:
     I2CDevice arduino, imu;
 
     // buffer of ultrasonic readings
-    int32_t ultrasonic_buffer[NUM_ULTRASONICS];
+    uint8_t ultrasonic_buffer[NUM_ULTRASONICS];
     // buffer used to read accel and gyro
     // each reading is stored in 2 registers, so we have to read them individual then combine
     int8_t imu_buffer[NUM_IMU_AXES*2];

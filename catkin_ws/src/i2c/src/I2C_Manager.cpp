@@ -10,7 +10,13 @@ namespace i2c_node {
 
 // the ultrasonic topics must be listed in the order the Jetson recieves data
 const std::array<std::string, I2C_Manager::NUM_ULTRASONICS> I2C_Manager::ULTRASONIC_TOPICS = {
+    "/ultrasonics/right",
+    "/ultrasonics/front_right",
+    "/ultrasonics/front_right_side",
     "/ultrasonics/back",
+    "/ultrasonics/front_left_side",
+    "/ultrasonics/front_left",
+    "/ultrasonics/left",
 };
 
 I2C_Manager::I2C_Manager(ros::NodeHandle& nh):
@@ -122,8 +128,8 @@ void I2C_Manager::timer_callback(const ros::TimerEvent&) {
     }
 
     // publish ultrasonic data on respective topic
-    std_msgs::Float32 distance;
     for (size_t i = 0; i < NUM_ULTRASONICS; ++i) {
+        std_msgs::Float32 distance;
         distance.data = ultrasonic_buffer[i];
         ultrasonic_publishers[i].publish(distance);
     }
@@ -190,11 +196,11 @@ void I2C_Manager::get_data() {
         //     << std::get<2>(imu_gyro) << ")"
         //     << std::endl;
 
-        // std::cout << "Got ultrasonic data:" << std::endl;
-        // for (size_t i = 0; i < NUM_ULTRASONICS; ++i) {
-        //     std::cout << ultrasonic_buffer[i] << " ";
-        // }
-        // std::cout << std::endl;
+        std::cout << "Got ultrasonic data:" << std::endl;
+        for (size_t i = 0; i < NUM_ULTRASONICS; ++i) {
+            std::cout << unsigned(ultrasonic_buffer[i]) << " ";
+        }
+        std::cout << std::endl;
 
         bool data_was_available = data_available.test_and_set(std::memory_order_seq_cst);
         assert(data_was_available == false);
