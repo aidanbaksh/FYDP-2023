@@ -72,6 +72,8 @@ class Calibration:
 
         self.wait_for_lidar_data = rospy.Rate(10)  # 10 Hz
 
+        self.filtered_pts = {} # TODO: REMOVE ME!
+
     """Records an ultrasonic reading for a given sensor in self._housing_distance_readings"""
     def _ultrasonic_reading_callback(self, msg: Float32) -> None:
         self._back_ultrasonic_distances.appendleft(msg.data)
@@ -102,7 +104,10 @@ class Calibration:
 
     def _filter_lidar(self, points: np.ndarray) -> np.ndarray:
         # only keep points which have x coordinate greater than 5cm
-        return points[points[:,0] >= constants.LIDAR_FILTER_X_THRESHOLD]
+        return points[
+            (constants.LIDAR_FILTER_X_MIN_THRESHOLD <= points[:,0]) &
+            (points[:,0] <= constants.LIDAR_FILTER_X_MAX_THRESHOLD)
+        ]
 
     """Takes a reading from a lidar sensor and finds a plane"""
     def _get_ground_plane(self, lidar: LiDAR,
@@ -142,13 +147,21 @@ class Calibration:
         # filter points
         lidar3d_points = self._filter_lidar(lidar3d_points)
 
+        self.filtered_pts[lidar] = lidar3d_points  # TODO: REMOVE ME!
+
         plane_eqn, _ = pyrsc.Plane().fit(lidar3d_points, constants.GROUND_PLANE_RANSAC_THRESHOLD)
+        plane_eqn = np.array(plane_eqn)  # convert to np.ndarray
+
+        # flip the planes so the normal points up
+        if plane_eqn[3] < 0:
+            plane_eqn = -plane_eqn
+
         rospy.loginfo('Ground Plane (%s): [%f, %f, %f, %f]', lidar.value, *plane_eqn)
         return plane_eqn
 
     """Gets normal vector from plane equation of the form Ax + Bx + Cx + D = 0"""
-    def _get_plane_normal_vector(self, plane_eqn: list) -> np.ndarray:
-        return np.array(plane_eqn[0:3]) # A, B, and C are elements of normal vector
+    def _get_plane_normal_vector(self, plane_eqn: np.ndarray) -> np.ndarray:
+        return plane_eqn[0:3] # A, B, and C are elements of normal vector
 
     """Gets the rotation matrix which rotates a to be collinear with b"""
     def _rotation_matrix_for_plane(self, a: np.ndarray, b: np.ndarray) -> np.ndarray:
@@ -261,12 +274,6 @@ class Calibration:
         left_plane_normal = self._get_plane_normal_vector(left_plane_eqn)
         right_plane_normal = self._get_plane_normal_vector(right_plane_eqn)
 
-        # pick the normal that is closer to e_3
-        if left_plane_normal[2] < 0:
-            left_plane_normal = -left_plane_normal
-        if right_plane_normal[2] < 0:
-            right_plane_normal = -right_plane_normal
-
         R_left_plane = self._rotation_matrix_for_plane(left_plane_normal, e_3)
         R_right_plane = self._rotation_matrix_for_plane(right_plane_normal, e_3)
 
@@ -278,8 +285,24 @@ class Calibration:
         front_right_tf = self._apply_rotation_to_tf(front_right_tf, R_right_plane)
 
         # calculate distance to ground plane of each lidar
-        
-        # extract planes to figure out z offset of front sensors
+        back_plane_height = back_plane_eqn[3]
+        left_plane_height = left_plane_eqn[3]
+        right_plane_height = right_plane_eqn[3]
+
+        assert(back_plane_height >= 0)
+        assert(left_plane_height >= 0)
+        assert(right_plane_height >= 0)
+
+        left_lidar_z_offset = back_lidar_z_offset + left_plane_height - back_plane_height
+        right_lidar_z_offset = back_lidar_z_offset + right_plane_height - back_plane_height
+
+        # update z offset for left and right lidar
+        front_left_tf[2,3] = left_lidar_z_offset
+        front_right_tf[2,3] = right_lidar_z_offset
+
+        rospy.loginfo('Back Z Offset (cm): %f', back_lidar_z_offset * 100)
+        rospy.loginfo('Left Z Offset (cm): %f', left_lidar_z_offset * 100)
+        rospy.loginfo('Right Z Offset (cm): %f', right_lidar_z_offset * 100)
 
         # setup initial guess vector
         # NOTE: this should match how values are extracted in _tfs_from_solution
@@ -306,55 +329,69 @@ class Calibration:
         rospy.loginfo("Published calibrated transforms")
 
 
-        # debugging
-        # from std_msgs.msg import Header
-        # h = Header()
-        # h.stamp = rospy.Time.now()
-        # h.frame_id = constants.BACK_FRAME
-        # cloud = pc2.create_cloud_xyz32(h, self._back_lidar_points.astype(np.float32))
-
+        # debugging !!
+        from std_msgs.msg import Header
         from geometry_msgs.msg import PolygonStamped, Point32
 
-        plane_topics = [
-            'back_plane',
-            'front_left_plane',
-            'front_right_plane',
-        ]
-        plane_frame = [
+        frames = [
             constants.BACK_FRAME,
             constants.FRONT_LEFT_FRAME,
             constants.FRONT_RIGHT_FRAME,
         ]
+        topic_postfix = [
+            'back',
+            'front_left',
+            'front_right',
+        ]
+        lidars = [LiDAR.BACK, LiDAR.LEFT, LiDAR.RIGHT ]
+        plane_eqs = [back_plane_eqn, left_plane_eqn, right_plane_eqn]
+
+        filt_pubs = []
         plane_pubs = []
+
+        filts = []
         planes = []
 
-        for i, plane_eqn in enumerate([back_plane_eqn, left_plane_eqn, right_plane_eqn]):
-            plane = PolygonStamped()
-            plane.header.stamp = rospy.Time.now()
-            plane.header.frame_id = plane_frame[i]
-            plane.polygon.points = []
-
-            for (y, z) in [(0.1, 0.1), (0.1, -0.1), (-0.1, -0.1), (-0.1, 0.1)]:
-                p = Point32()
-                p.y = y
-                p.z = z
-                p.x = (
-                    plane_eqn[1] * y + plane_eqn[2] * z + plane_eqn[3]
-                ) / -plane_eqn[0]
-                plane.polygon.points.append(p)
-
-            planes.append(plane)    
-            plane_pubs.append(
-                rospy.Publisher(plane_topics[i], PolygonStamped, queue_size=5)
+        for i, fr in enumerate(frames):
+            # filtered points
+            filt_topic = '/filtered_' + topic_postfix[i]
+            filt_pubs.append(
+                rospy.Publisher(filt_topic, PointCloud2, queue_size=1)
             )
+
+            h = Header()
+            h.stamp = rospy.Time.now()
+            h.frame_id = fr
+            filts.append(
+                pc2.create_cloud_xyz32(h, self.filtered_pts[lidars[i]])
+            )
+
+            # detected ground planes
+            plane_topic = '/plane_' + topic_postfix[i]
+            plane_pubs.append(
+                rospy.Publisher(plane_topic, PolygonStamped, queue_size=5)
+            )
+
+            p = PolygonStamped()
+            p.header.stamp = rospy.Time.now()
+            p.header.frame_id = fr
+            p.polygon.points = []
+            for (y, z) in [(0.1, 0.1), (0.1, -0.1), (-0.1, -0.1), (-0.1, 0.1)]:
+                pt = Point32()
+                pt.y = y
+                pt.z = z
+                pt.x = (
+                    plane_eqs[i][1] * y + plane_eqs[i][2] * z + plane_eqs[i][3]
+                ) / -plane_eqs[i][0]
+                p.polygon.points.append(pt)
+            planes.append(p)
 
         rate = rospy.Rate(1)
         while not rospy.is_shutdown():
-            for i, pub in enumerate(plane_pubs):
-                pub.publish(planes[i])
+            for i in range(3):
+                plane_pubs[i].publish(planes[i])
+                filt_pubs[i].publish(filts[i])
 
-            # filt_pub = rospy.Publisher('/filtered_pts', PointCloud2, queue_size=5)
-            # filt_pub.publish(cloud)
             rate.sleep()
 
     def _apply_rotation_to_tf(self, T: np.ndarray, R: np.ndarray) -> np.ndarray:
