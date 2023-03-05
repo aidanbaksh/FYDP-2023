@@ -13,14 +13,19 @@
 #include <pcl/filters/extract_indices.h>
 #include <pcl/filters/passthrough.h>
 #include <pcl/search/kdtree.h>
+#include <pcl/search/search.h>
+#include <pcl/features/normal_3d.h>
+#include <pcl/segmentation/region_growing.h>
 #include <pcl/segmentation/extract_clusters.h>
 #include <pcl/filters/statistical_outlier_removal.h>
 #include <pcl/common/centroid.h>
+#include <pcl/filters/crop_box.h>
 
-ros::Publisher pub;
+ros::Publisher pub_ground;
 ros::Publisher pub_ng;
-ros::Publisher pub_clusters;
 ros::Publisher pub_curb_cloud;
+ros::Publisher pub_avg_cloud;
+ros::Publisher pub_object_cloud;
 
 std::pair<pcl::PointCloud<pcl::PointXYZ>::Ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr> seperate_clouds(pcl::PointIndices::Ptr inliers, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud)
 {
@@ -42,77 +47,67 @@ std::pair<pcl::PointCloud<pcl::PointXYZ>::Ptr, pcl::PointCloud<pcl::PointXYZ>::P
   return segResult;
 }
 
-void formClusters(pcl::PointCloud<pcl::PointXYZ>::Ptr object_cloud)
-{
-  // pcl::PointCloud<pcl::PointXYZ>::Ptr object_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-  // pcl::fromPCLPointCloud2(*cloud_blob, *object_cloud);
+void find_objects(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud){
 
-  pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>);
-  tree->setInputCloud(object_cloud);
+  if(input_cloud->size() >  0){
+    // pcl::search::Search<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>);
+    // pcl::PointCloud<pcl::Normal>::Ptr normals(new pcl::PointCloud<pcl::Normal>);
+    // pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> normal_estimator;
+    // normal_estimator.setSearchMethod(tree);
+    // normal_estimator.setInputCloud(input_cloud);
+    // normal_estimator.setKSearch(50);
+    // normal_estimator.compute(*normals);
 
-  std::vector<pcl::PointIndices> cluster_indices;
-  pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
-  ec.setClusterTolerance(0.08);
-  ec.setMinClusterSize(10);
-  ec.setMaxClusterSize(500);
-  ec.setSearchMethod(tree);
-  ec.setInputCloud(object_cloud);
-  ec.extract(cluster_indices);
+    // pcl::RegionGrowing<pcl::PointXYZ, pcl::Normal> reg;
+    // std::vector <pcl::PointIndices> clusters;
+    // reg.setMinClusterSize(50);
+    // reg.setMaxClusterSize(200);
+    // reg.setSearchMethod(tree);
+    // reg.setNumberOfNeighbours(30);
+    // reg.setInputCloud(input_cloud);
+    // reg.setInputNormals(normals);
+    // reg.setSmoothnessThreshold(3.0/180.0*3.1415);
+    // reg.setCurvatureThreshold(0.5);
+    // reg.extract(clusters);
 
-  uint8_t r = 100, g = 0, b = 0;
-  pcl::PointCloud<pcl::PointXYZ>::Ptr output_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-  std::cout << "Num Objects clustered: " << cluster_indices.size() << std::endl;
-  int largest = 0;
-  std::vector<pcl::PointIndices>::const_iterator pit = cluster_indices.begin();
-  for(std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin(); it != cluster_indices.end(); ++it){
-    if(it->indices.size() > largest){
-      largest = it->indices.size();
-      pit = it;
+    // pcl::PointCloud<pcl::PointXYZRGB>::Ptr color = reg.getColoredCloud();
+    // std::cout << " color size " << color->size() << std::endl;
+
+    pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>);
+    tree->setInputCloud(input_cloud);
+    std::vector<pcl::PointIndices> cluster_indices;
+    pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
+    ec.setClusterTolerance(0.05);
+    ec.setMinClusterSize(50);
+    ec.setMaxClusterSize(25000);
+    ec.setSearchMethod(tree);
+    ec.setInputCloud(input_cloud);
+    ec.extract(cluster_indices);
+    //std::cout<< "num cluster: " << cluster_indices.size() <<" dude size pls: " << std::endl;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr output_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+    for(int i =0; i<cluster_indices.size(); i++){
+      //std::cout<<cluster_indices[i].indices.size()<< std::endl;
+      if(cluster_indices[i].indices.size() > 500){
+        double xObjSum = 0;
+        double yObjSum = 0;
+        int objPCounter = 0;
+        for(int it : cluster_indices[i].indices){
+          output_cloud->push_back(input_cloud->points[it]);
+          xObjSum += input_cloud->points[it].x;
+          yObjSum += input_cloud->points[it].y;
+          objPCounter++;
+        }
+        double objCenterX = xObjSum/objPCounter;
+        double objCenterY = yObjSum/objPCounter;
+        std::cout<<"obj x: " << objCenterX << " obj Y " << objCenterY << " size " << cluster_indices[i].indices.size() <<std::endl;
+      }
     }
+    
+    pcl::PCLPointCloud2 test;
+    pcl::toPCLPointCloud2(*output_cloud, test);
+    test.header.frame_id = "wheelchair";
+    pub_object_cloud.publish(test);
   }
-
-  for(std::vector<int>::const_iterator it = pit->indices.begin(); it!=pit->indices.end(); ++it){
-    output_cloud->points.push_back(object_cloud->points[*it]);
-  }
-  std::cout<< "test: " << output_cloud->points.size() << std::endl;
-  pcl::PCLPointCloud2 outcloud;
-  pcl::toPCLPointCloud2(*object_cloud, outcloud);
-  outcloud.header.frame_id = "wheelchair";
-  pub_clusters.publish(outcloud);
-  // if(cluster_indices.size() != 0){
-  //   std::cout << "Num Points in cluster: " << cluster_indices[0].indices.size() << std::endl;
-  //   for(std::vector<int>::const_iterator pit = cluster_indices[0].indices.begin(); pit != cluster_indices[0].indices.end(); ++pit){
-  //     output_cloud->points.push_back(object_cloud->points[*pit]);
-  //   }
-  //   pcl::PCLPointCloud2 outcloud;
-  //   pcl::toPCLPointCloud2(*object_cloud, outcloud);
-  //   outcloud.header.frame_id = "laser_link";
-  //   pub_clusters.publish(outcloud);
-  // }
-  // for(std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin(); it != cluster_indices.end(); ++it)
-  // {
-  //   if (r != 200){
-  //     r += 100;
-  //   }else if(g != 200){
-  //     g += 100;
-  //   }else if(b != 200){
-  //     b += 100;
-  //   }else{
-  //     r = g = b = 0;
-  //   }
-  //   pcl::PointCloud<pcl::PointXYZ>::Ptr cur_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-  //   uint32_t rgb = ((uint32_t)r << 16 | (uint32_t)g << 8 | (uint32_t)b);
-  //   bool first = true;
-  //   for(std::vector<int>::const_iterator pit = it->indices.begin(); pit != it->indices.end(); ++pit){
-  //     object_cloud->at(*pit).rgb = *reinterpret_cast<float*>(&rgb);
-  //     output_cloud->points.push_back(object_cloud->points[*pit]);
-  //     cur_cloud->points.push_back(object_cloud->points[*pit]);
-  //   }
-  // }
-  // pcl::PCLPointCloud2 outcloud;
-  // pcl::toPCLPointCloud2(*object_cloud, outcloud);
-  // outcloud.header.frame_id = "laser_link";
-  // pub_clusters.publish(outcloud);
 }
 
 void find_plane(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud, pcl::ModelCoefficients::Ptr coefficients, pcl::PointIndices::Ptr inliers, float dist_thresh, float eps_angle){
@@ -128,20 +123,12 @@ void find_plane(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud, pcl::ModelCoeff
   seg.segment(*inliers, *coefficients);
 }
 
-void cloud_cb (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
+void find_curbs (pcl::PCLPointCloud2::Ptr cloud_blob)
 {
-  pcl::PCLPointCloud2::Ptr cloud_filtered_blob(new pcl::PCLPointCloud2);
+  double highestZ = -1;
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_p(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_f(new pcl::PointCloud<pcl::PointXYZ>);
 
-  pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
-  sor.setInputCloud(cloud_blob);
-  sor.setLeafSize(0.01f, 0.01f, 0.01f);
-  sor.filter(*cloud_filtered_blob);
-
-  pcl::fromPCLPointCloud2(*cloud_filtered_blob, *cloud_filtered);
-
+  pcl::fromPCLPointCloud2(*cloud_blob, *cloud_filtered);
   pcl::PassThrough<pcl::PointXYZ> rough_ground_pass;
   pcl::PointCloud<pcl::PointXYZ>::Ptr rough_ground(new pcl::PointCloud<pcl::PointXYZ>);
   rough_ground_pass.setInputCloud(cloud_filtered);
@@ -154,44 +141,73 @@ void cloud_cb (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
   find_plane(rough_ground, rough_coefficients, rough_inliers, 0.05, 0.025);
   if(rough_inliers->indices.size() > 0){
     //plane found
+    if(abs(rough_coefficients->values[3]) < abs(highestZ)){
+      highestZ = -(rough_coefficients->values[3]);
+    }
     pcl::PassThrough<pcl::PointXYZ> pass;
     pass.setInputCloud(cloud_filtered);
     pcl::PointCloud<pcl::PointXYZ>::Ptr ground(new pcl::PointCloud<pcl::PointXYZ>);
     pcl::PointCloud<pcl::PointXYZ>::Ptr not_ground(new pcl::PointCloud<pcl::PointXYZ>);
     pass.setFilterFieldName("z");
-    pass.setFilterLimits(-abs(rough_coefficients->values[3])-1, -abs(rough_coefficients->values[3])+0.1);
+    pass.setFilterLimits(-abs(rough_coefficients->values[3])-0.1, -abs(rough_coefficients->values[3])+0.1);
     pass.filter(*ground);
-    pass.setNegative(true);
-    pass.filter(*not_ground);
 
     pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients());
     pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
     find_plane(ground, coefficients, inliers, 0.03, 0.01);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr potential_curb(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr front_curb(new pcl::PointCloud<pcl::PointXYZ>);
     if(inliers->indices.size() > 0){
+      if(abs(coefficients->values[3]) < abs(highestZ)){
+        highestZ = -(coefficients->values[3]);
+      }
       std::pair<pcl::PointCloud<pcl::PointXYZ>::Ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr> segResult = seperate_clouds(inliers, ground);
+      pcl::PassThrough<pcl::PointXYZ> notGroundPass;
+      notGroundPass.setInputCloud(cloud_filtered);
+      notGroundPass.setFilterFieldName("z");
+      notGroundPass.setFilterLimits(-abs(coefficients->values[3])-0.05, -abs(coefficients->values[3])+0.05);
+      notGroundPass.setNegative(true);
+      notGroundPass.filter(*not_ground);
+
+      pcl::PassThrough<pcl::PointXYZ> curbPass;
+      curbPass.setInputCloud(not_ground);
+      curbPass.setFilterFieldName("z");
+      curbPass.setFilterLimits(-abs(coefficients->values[3])-0.20, -abs(coefficients->values[3])+0.20);
+      curbPass.filter(*potential_curb);
+
+      pcl::PassThrough<pcl::PointXYZ> frontPass;
+      frontPass.setInputCloud(potential_curb);
+      frontPass.setFilterFieldName("x");
+      frontPass.setFilterLimits(0, 2);
+      frontPass.filter(*front_curb);
+      
 
       pcl::ModelCoefficients::Ptr curb_coeffs (new pcl::ModelCoefficients());
       pcl::PointIndices::Ptr curb_inliers(new pcl::PointIndices());
-      find_plane(not_ground, curb_coeffs, curb_inliers, 0.025, 0.2);
-
-      if(curb_inliers->indices.size() > 0 && abs(abs(curb_coeffs->values[3])-abs(coefficients->values[3])) > 0.05){
+      find_plane(front_curb, curb_coeffs, curb_inliers, 0.03, 0.2);
+      std::cout << curb_inliers->indices.size() << std::endl;
+      if(curb_inliers->indices.size() > 750 && abs(abs(curb_coeffs->values[3])-abs(coefficients->values[3])) > 0.05){
         //std::cout<<"curb difference: " << abs(abs(curb_coeffs->values[3])-abs(coefficients->values[3]))<< std::endl;
+        if(abs(curb_coeffs->values[3]) < abs(highestZ)){
+          highestZ = -(curb_coeffs->values[3]);
+        }
         double xCurbSum = 0;
         double yCurbSum = 0;
         int curbPCounter = 0;
         for(int it : curb_inliers->indices){
-          xCurbSum += not_ground->points[it].x;
-          yCurbSum += not_ground->points[it].y;
+          xCurbSum += front_curb->points[it].x;
+          yCurbSum += front_curb->points[it].y;
           curbPCounter++;
         }
         double curbCenterX = xCurbSum/curbPCounter;
         double curbCenterY = yCurbSum/curbPCounter;
         //std::cout << "curb plane center x: " << curbCenterX << " center y: " << curbCenterY << std::endl;
-        if(abs(curb_coeffs->values[3]) - abs(coefficients->values[3]) < 0){
-          std::cout << "Curb up detected ";
-        }else{
-          std::cout << "Curb down detected ";
-        }
+        // if(abs(curb_coeffs->values[3]) - abs(coefficients->values[3]) < 0){
+        //   std::cout << "Curb up detected ";
+        // }else{
+        //   std::cout << "Curb down detected ";
+        // }
+        std::cout << "Curb detected " << std::endl;
         if(curbCenterX > 0){
           std::cout << "front ";
         }else{
@@ -205,7 +221,7 @@ void cloud_cb (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
           std::cout << "center";
         }
         std::cout << std::endl;
-        std::pair<pcl::PointCloud<pcl::PointXYZ>::Ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr> curbResult = seperate_clouds(curb_inliers, not_ground);
+        std::pair<pcl::PointCloud<pcl::PointXYZ>::Ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr> curbResult = seperate_clouds(curb_inliers, front_curb);
         pcl::PCLPointCloud2 curb_cloud;
         pcl::toPCLPointCloud2(*(curbResult.second), curb_cloud);
         curb_cloud.header.frame_id = "wheelchair";
@@ -214,96 +230,79 @@ void cloud_cb (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
       pcl::PCLPointCloud2 ground_cloud;
       pcl::toPCLPointCloud2(*(segResult.second), ground_cloud);
       ground_cloud.header.frame_id = "wheelchair";
-      pub.publish(ground_cloud);
+      pub_ground.publish(ground_cloud);
 
+      pcl::PointCloud<pcl::PointXYZ>::Ptr objectSegCloud(new pcl::PointCloud<pcl::PointXYZ>);
+      pcl::PassThrough<pcl::PointXYZ> removeNegatives;
+      removeNegatives.setInputCloud(not_ground);
+      removeNegatives.setFilterFieldName("z");
+      removeNegatives.setFilterLimits(-abs(highestZ)+0.2, 0.5);
+      removeNegatives.filter(*objectSegCloud);
+      find_objects(objectSegCloud);
     }
-
-      // pcl::PointCloud<pcl::PointXYZ>::Ptr xFiltered(new pcl::PointCloud<pcl::PointXYZ>);
-      // pcl::PointCloud<pcl::PointXYZ>::Ptr yFiltered(new pcl::PointCloud<pcl::PointXYZ>);
-      // pcl::PassThrough<pcl::PointXYZ> xPass;
-      // pcl::PassThrough<pcl::PointXYZ> yPass;
-      // xPass.setInputCloud(not_ground);
-      // xPass.setFilterFieldName("x");
-      // xPass.setFilterLimits(-1.1, 2);
-      // xPass.filter(*xFiltered);
-      // yPass.setInputCloud(xFiltered);
-      // yPass.setFilterFieldName("y");
-      // yPass.setFilterLimits(-1, 1);
-      // yPass.filter(*yFiltered);
-
-      // pcl::PointCloud<pcl::PointXYZ>::Ptr outliersRemoved(new pcl::PointCloud<pcl::PointXYZ>);
-      // pcl::StatisticalOutlierRemoval<pcl::PointXYZ> outlier_filter;
-      // outlier_filter.setInputCloud(yFiltered);
-      // outlier_filter.setMeanK(100);
-      // outlier_filter.setStddevMulThresh(0.1);
-      // outlier_filter.filter(*outliersRemoved);
-
-      // pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>);
-      // tree->setInputCloud(outliersRemoved);
-
-      // std::vector<pcl::PointIndices> cluster_indices;
-      // pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
-      // ec.setClusterTolerance(0.05);
-      // ec.setMinClusterSize(100);
-      // ec.setMaxClusterSize(25000);
-      // ec.setSearchMethod(tree);
-      // ec.setInputCloud(outliersRemoved);
-      // ec.extract(cluster_indices);
-
-      // std::cout<<"objects detected: " << cluster_indices.size() << std::endl;
-      // for(int i=0; i<cluster_indices.size(); i++){
-      //   pcl::PointIndices::Ptr cur_cluster_indices(new pcl::PointIndices());
-      //   pcl::CentroidPoint<pcl::PointXYZ> cur_cent_calc;
-      //   double x = 0;
-      //   double y = 0;
-      //   int numCounter = 0;
-      //   for(int it : inliers->indices)
-      //   {
-      //     double cur_x = outliersRemoved->points[it].x;
-      //     double cur_y = outliersRemoved->points[it].y;
-      //     if(cur_x > -1.1 && cur_x < 2 && cur_y > -1 && cur_y < 1){
-      //       x += cur_x;
-      //       y += cur_y;
-      //       numCounter++;
-      //     }
-      //     // cur_cent_calc.add(outliersRemoved->points[it]);
-      //   }
-      //   //pcl::CentroidPoint<pcl::PointXYZ> cur_cent(new pcl::PointXYZ);
-      //   // pcl::PointXYZ c1;
-      //   // cur_cent_calc.get(c1);
-      //   //pcl::computeCentroid(cur_cluster_cloud, cur_cent);
-      //   std::cout << "cur centroid x: " << (x/(numCounter)) << " cur cen  y: " << (y/(numCounter))<< " ";
-      // }
-      // std::cout << std::endl;
 
       pcl::PCLPointCloud2 not_ground_cloud;
       pcl::toPCLPointCloud2(*not_ground, not_ground_cloud);
       not_ground_cloud.header.frame_id = "wheelchair";
       pub_ng.publish(not_ground_cloud);
   }
+}
 
-  // std::pair<pcl::PointCloud<pcl::PointXYZ>::Ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr> segResult = seperate_clouds(inliers, cloud_filtered);
-  // pcl::PCLPointCloud2 outcloud;
-  // pcl::toPCLPointCloud2(*(segResult.second), outcloud);
-  // outcloud.header.frame_id = "wheelchair";
-  // pcl::PCLPointCloud2 objectcloud;
-  // pcl::toPCLPointCloud2(*(segResult.first), objectcloud);
-  // objectcloud.header.frame_id = "wheelchair";
-  // pub.publish(outcloud);
-  // pub_obst.publish(objectcloud);
-  //formClusters((segResult.first));
+pcl::PCLPointCloud2::Ptr sumPointClouds(new pcl::PCLPointCloud2);
+int counter = 0;
+void cloud_cb(const pcl::PCLPointCloud2ConstPtr& cloud_blob){
+  // pcl::PCLPointCloud<pcl::PointXYZ> curCloud;
+  // pcl::fromROSMsg(*cloud_blob, curCloud);
+
+  pcl::PointCloud<pcl::PointXYZ>::Ptr converted_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::PointCloud<pcl::PointXYZ>::Ptr distance_filtered_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::PointCloud<pcl::PointXYZ>::Ptr wheelchair_removed_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::fromPCLPointCloud2(*cloud_blob, *converted_cloud);
+
+  pcl::CropBox<pcl::PointXYZ> distanceFilter;
+  //0.25 and 0.75
+  distanceFilter.setMin(Eigen::Vector4f(-1, -1, -0.5, 1.0));
+  distanceFilter.setMax(Eigen::Vector4f(1.5, 1, 0.5, 1.0));
+  distanceFilter.setInputCloud(converted_cloud);
+  distanceFilter.filter(*distance_filtered_cloud);
+
+  pcl::PassThrough<pcl::PointXYZ> wheelchair_filter;
+  wheelchair_filter.setInputCloud(distance_filtered_cloud);
+  wheelchair_filter.setFilterFieldName("x");
+  wheelchair_filter.setFilterLimits(-0.3, 0.8);
+  wheelchair_filter.setNegative(true);
+  wheelchair_filter.filter(*wheelchair_removed_cloud);
+
+  pcl::PCLPointCloud2 wheelchair_rm_blob;
+  pcl::toPCLPointCloud2(*wheelchair_removed_cloud, wheelchair_rm_blob);
+  *sumPointClouds += wheelchair_rm_blob;
+
+  if(counter == 5){
+    counter = 0;
+    pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
+    pcl::PCLPointCloud2::Ptr avgPtCloud(new pcl::PCLPointCloud2);
+    sor.setInputCloud(sumPointClouds);
+    sor.setLeafSize(0.035f, 0.035f, 0.025f);
+    sor.filter(*avgPtCloud);
+    find_curbs(avgPtCloud);
+    pub_avg_cloud.publish(avgPtCloud);
+    sumPointClouds.reset(new pcl::PCLPointCloud2);
+  }
+
+  counter++;
 }
 
 int main (int argc, char** argv)
 {
-  ros::init (argc, argv, "obstacles");
+  ros::init (argc, argv, "plane_detector");
   ros::NodeHandle nh;
 
   ros::Subscriber sub = nh.subscribe ("/lidar_merged", 1, cloud_cb);
-  pub = nh.advertise<pcl::PCLPointCloud2> ("/plane_cloud", 1);
+  pub_ground = nh.advertise<pcl::PCLPointCloud2> ("/plane_cloud", 1);
+  pub_avg_cloud = nh.advertise<pcl::PCLPointCloud2> ("/avg_cloud", 1);
   pub_ng = nh.advertise<pcl::PCLPointCloud2> ("/not_ground_cloud", 1);
   pub_curb_cloud = nh.advertise<pcl::PCLPointCloud2> ("/curb_cloud", 1);
-  pub_clusters = nh.advertise<pcl::PCLPointCloud2> ("/obstacles", 1);
+  pub_object_cloud = nh.advertise<pcl::PCLPointCloud2> ("/object_cloud", 1);
 
   ros::spin ();
 }
