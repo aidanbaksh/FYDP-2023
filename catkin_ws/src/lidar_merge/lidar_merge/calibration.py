@@ -139,7 +139,7 @@ class Calibration:
         wall_plane_eqn = self._get_lidar_plane(lidar, filter_lidar)
 
         # flip the planes so it points in the positive x direction
-        if wall_plane_eqn[3] < 0:
+        if wall_plane_eqn[0] < 0:
             wall_plane_eqn = -wall_plane_eqn
 
         rospy.loginfo('Wall Plane (%s): [%f, %f, %f, %f]', lidar.value, *wall_plane_eqn)
@@ -346,11 +346,11 @@ class Calibration:
         right_wall_plane_eqn = self._get_wall_plane(LiDAR.RIGHT, R_right_ground_plane, wheelchair_to_ground_z + right_lidar_z_offset)
 
         # find rotation to make wall plane normal to x axis
-        e_1 = np.array([-1, 0, 0])
+        e_1 = np.array([1, 0, 0])
 
         # compute plane normals
-        left_wall_plane_normal = self._get_plane_normal_vector(left_ground_plane_eqn)
-        right_wall_plane_normal = self._get_plane_normal_vector(right_ground_plane_eqn)
+        left_wall_plane_normal = self._get_plane_normal_vector(left_wall_plane_eqn)
+        right_wall_plane_normal = self._get_plane_normal_vector(right_wall_plane_eqn)
 
         # ignore z components in rotation
         left_wall_plane_normal[2] = 0
