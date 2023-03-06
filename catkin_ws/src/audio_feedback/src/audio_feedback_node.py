@@ -26,7 +26,7 @@ class SoundManager:
         self._node_start_time = rospy.Time.now()
 
         self._sev_time_delays = {
-            Severity.LOW: rospy.Duration(10),
+            Severity.LOW: rospy.Duration(5),
             Severity.MEDIUM: rospy.Duration(5),
             Severity.HIGH: rospy.Duration(0)
         }
