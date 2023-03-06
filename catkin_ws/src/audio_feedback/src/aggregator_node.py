@@ -102,13 +102,13 @@ class Aggregator:
             self._publish_message(HazardType.CURB, Direction.BACK, Severity.LOW)
 
     def _lidar_object_callback(self, msg: LidarObject) -> None:
-        if msg.front == True:
+        if msg.front:
             self._publish_message(HazardType.OBJECT, Direction.FRONT, Severity.LOW)
-        if msg.front_right == True:
+        if msg.front_right:
             self._publish_message(HazardType.OBJECT, Direction.FRONT_RIGHT, Severity.LOW)
-        if msg.front_left == True:
+        if msg.front_left:
             self._publish_message(HazardType.OBJECT, Direction.FRONT_LEFT, Severity.LOW)
-        if msg.back == True:
+        if msg.back:
             self._publish_message(HazardType.OBJECT, Direction.BACK, Severity.LOW)
 
     def _publish_message(self, h_type: HazardType, dir: Direction, sev: Severity) -> None:
