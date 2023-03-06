@@ -113,9 +113,9 @@ class Aggregator:
 
     def _publish_message(self, h_type: HazardType, dir: Direction, sev: Severity) -> None:
             new_msg = AudioWarning()
-            new_msg.warning_type = int(h_type)
-            new_msg.direction = int(dir)
-            new_msg.severity = int(sev)
+            new_msg.warning_type = h_type
+            new_msg.direction = dir
+            new_msg.severity = sev
             self._publisher.publish(new_msg)
 
 

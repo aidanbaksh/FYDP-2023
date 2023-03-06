@@ -1,6 +1,6 @@
-from enum import Enum
+from enum import IntEnum
 
-class HazardType(Enum):
+class HazardType(IntEnum):
     CURB = 0
     OBJECT = 1
     TIP = 2
@@ -8,7 +8,7 @@ class HazardType(Enum):
     def has_value(cls, value):
         return value in cls._value2member_map_
 
-class Direction(Enum):
+class Direction(IntEnum):
     FRONT = 0
     FRONT_RIGHT = 1
     RIGHT = 2
@@ -21,7 +21,7 @@ class Direction(Enum):
     def has_value(cls, value):
         return value in cls._value2member_map_
 
-class Severity(Enum):
+class Severity(IntEnum):
     LOW = 0
     MEDIUM = 1
     HIGH = 2
