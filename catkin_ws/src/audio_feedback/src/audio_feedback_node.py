@@ -1,42 +1,12 @@
 #!/usr/bin/env python3
 
-from enum import Enum
-
 import rospy
 from std_msgs.msg import Float32, Bool
 from sound_play.libsoundplay import SoundClient
 from sound_play.msg import SoundRequest
 from audio_feedback.msg import AudioWarning
 
-
-class HazardType(Enum):
-    CURB = 0
-    OBJECT = 1
-    TIP = 2
-    @classmethod
-    def has_value(cls, value):
-        return value in cls._value2member_map_
-
-class Direction(Enum):
-    FRONT = 0
-    FRONT_RIGHT = 1
-    RIGHT = 2
-    BACK_RIGHT = 3
-    BACK = 4
-    BACK_LEFT = 5
-    LEFT = 6
-    FRONT_LEFT = 7
-    @classmethod
-    def has_value(cls, value):
-        return value in cls._value2member_map_
-
-class Severity(Enum):
-    LOW = 0
-    MEDIUM = 1
-    HIGH = 2
-    @classmethod
-    def has_value(cls, value):
-        return value in cls._value2member_map_
+from custom_enums import HazardType, Direction, Severity
 
 
 class SoundManager:
@@ -58,7 +28,7 @@ class SoundManager:
             Severity.LOW: rospy.Duration(10),
             Severity.MEDIUM: rospy.Duration(5),
             Severity.HIGH: rospy.Duration(0)
-            }
+        }
     
     def _audio_warning_callback(self, msg: AudioWarning) -> None:
         h_type = msg.warning_type
