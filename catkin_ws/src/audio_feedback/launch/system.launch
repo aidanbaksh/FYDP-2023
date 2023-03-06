@@ -12,7 +12,7 @@
   <include file="$(find ultrasonic_detectors)/launch/object_detectors.launch"/>
 
   <!-- LiDAR Detection -->
-  <node pkg="lidar" type="plane_detector" name="plane_detection" output="screen"/>
+  <node pkg="lidar" type="plane_detector" name="plane_detection"/>
   
   <!-- aggregator and audio feedback -->
   <node pkg="audio_feedback" type="aggregator_node.py" name="aggregator" output="screen"/>

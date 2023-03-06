@@ -55,12 +55,8 @@ class Aggregator:
         )
 
         self._lidar_object_subscriber = rospy.Subscriber(
-            '/lidar/object_detect', LidarObject, self._lidar_curb_callback
+            '/lidar/object_detect', LidarObject, self._lidar_object_callback
         )
-
-        # self._warning_wait_time = rospy.Duration(10)
-        # self._curb_warning_times = {dir: rospy.Time.now() for dir in Direction.__members__}
-        # self._object_warning_times = {dir: rospy.Time.now() for dir in Direction.__members__} 
 
     # Ultrasonic callbacks
     def _l_US_callback(self, msg: UltrasonicObject) -> None:

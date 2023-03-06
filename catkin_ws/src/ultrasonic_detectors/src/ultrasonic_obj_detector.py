@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
 import rospy
-from std_msgs.msg import Float32, Bool
+from std_msgs.msg import Float32
+from audio_feedback.msg import UltrasonicObject
 
 
 class UltrasonicObstacleDetector:
@@ -16,7 +17,7 @@ class UltrasonicObstacleDetector:
     def start(self) -> None:
         # infer topic to use for publishing detected obstacles
         output_topic = '{ultrasonic}/object_detect'.format(ultrasonic=self._input_topic)
-        self._detection_publisher = rospy.Publisher(output_topic, Bool, queue_size=10)
+        self._detection_publisher = rospy.Publisher(output_topic, UltrasonicObject, queue_size=10)
 
         # set up subscriber for ultrasonic readings
         rospy.Subscriber(self._input_topic, Float32, self._ultrasonic_reading_callback)
@@ -24,6 +25,7 @@ class UltrasonicObstacleDetector:
         rospy.loginfo('Starting ultrasonic object detection for %s', self._input_topic)
 
     def _ultrasonic_reading_callback(self, msg: Float32) -> None:
+        # only mark detected objects for multiple subsequent readings
         distance = msg.data
         if distance <= self._detection_threshold:
             self._detected_count += 1
@@ -36,7 +38,10 @@ class UltrasonicObstacleDetector:
                 self._detected_count = 0
                 self._detected_flag = False
 
-        self._detection_publisher.publish(self._detected_flag)
+        # publish detected object
+        obj = UltrasonicObject()
+        obj.detection = self._detected_flag
+        self._detection_publisher.publish(obj)
     
 
 def main() -> None:
