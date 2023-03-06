@@ -30,7 +30,7 @@
     <param name="threshold" value="$(arg front_side_treshold)"/>
   </node>
 
-  <!-- left ultrasonics -->
+  <!-- right ultrasonics -->
   <node pkg="ultrasonic_detectors" type="ultrasonic_obj_detector.py" name="ultrasonic_front_right_detection" output="screen">
     <param name="ultrasonic_topic" value="/ultrasonics/front_right"/>
     <param name="threshold" value="$(arg front_treshold)"/>
