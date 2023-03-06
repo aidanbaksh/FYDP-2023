@@ -4,34 +4,57 @@ import rospy
 from std_msgs.msg import Float32, Bool
 
 
-detected_count = 0
-not_detected_count = 0
-detection_thresh = 0
-detected_flag = False
-def reading_cb(data):
-    distance = data.data
-    if distance < detection_thresh:
-        detected_count = detected_count+1
-        if detected_count > 5:
-            not_detected_count = 0
-            detected_flag = True
-    else:
-        not_detected_count=not_detected_count+1
-        if not_detected_count > 5:
-            detected_count = 0
-            detected_flag = False
-    pub.publish(detected_flag)
+class UltrasonicObstacleDetector:
+    def __init__(self, input_topic: str, threshold: float) -> None:
+        self._input_topic = input_topic
+
+        self._detected_count = 0
+        self._not_detected_count = 0
+        self._detection_threshold = threshold
+        self._detected_flag = False
+
+    def start(self) -> None:
+        # infer topic to use for publishing detected obstacles
+        output_topic = '{ultrasonic}/object_detect'.format(ultrasonic=self._input_topic)
+        self._detection_publisher = rospy.Publisher(output_topic, Bool, queue_size=10)
+
+        # set up subscriber for ultrasonic readings
+        rospy.Subscriber(self._input_topic, Float32, self._ultrasonic_reading_callback)
+
+        rospy.loginfo('Starting ultrasonic object detection for %s', self._input_topic)
+
+    def _ultrasonic_reading_callback(self, msg: Float32) -> None:
+        distance = msg.data
+        if distance <= self._detection_threshold:
+            self._detected_count += 1
+            if self._detected_count > 5:
+                self._not_detected_count = 0
+                self._detected_flag = True
+        else:
+            self._not_detected_count += 1
+            if self._not_detected_count > 5:
+                self._detected_count = 0
+                self._detected_flag = False
+
+        self._detection_publisher.publish(self._detected_flag)
+    
+
+def main() -> None:
+    # setup node
+    rospy.init_node('ultrasonic_obj_detector')
+
+    # print('params', rospy.get_param_names())
 
 
-def listener():
-    rospy.init_node('ultrasonic_obj_detector', anonymous = True)
-    input_path = rospy.get_param('~input_path', "ultrasonic")
-    output_path = rospy.get_param('~output_path', "test")
-    print(input_path)
-    print(output_path)
-    sub = rospy.Subscriber(input_path, Float32, reading_cb)
-    pub = rospy.Publisher(output_path, Bool, queue_size=10)
+    # get parameters
+    ultrasonic_topic = rospy.get_param('~ultrasonic_topic')
+    threshold = rospy.get_param('~threshold')
+
+    # run detector
+    detector = UltrasonicObstacleDetector(ultrasonic_topic, threshold)
+    detector.start()
     rospy.spin()
 
+
 if __name__ == '__main__':
-    listener()
+    main()

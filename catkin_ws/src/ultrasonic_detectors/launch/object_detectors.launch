@@ -1,6 +1,42 @@
 <launch>
-  <node pkg="ultrasonic_detectors" type="ultrasonic_obj_detector.py" name="front_ultra" output="screen">
-    <param name="input_path" value="/ultrasonics/left"/>
-    <param name="output_path" value="/ultrasonics/left/object"/>
+  <arg name="back_treshold" default="15"/>
+  <arg name="side_treshold" default="60"/>
+  <arg name="front_side_treshold" default="70"/>
+  <arg name="front_treshold" default="50"/>
+
+  <!-- back ultrasonic -->
+  <node pkg="ultrasonic_detectors" type="ultrasonic_obj_detector.py" name="ultrasonic_back_detection" output="screen">
+    <param name="ultrasonic_topic" value="/ultrasonics/back"/>
+    <param name="threshold" value="$(arg back_treshold)"/>
+  </node>
+
+  <!-- side ultrasonics -->
+  <node pkg="ultrasonic_detectors" type="ultrasonic_obj_detector.py" name="ultrasonic_left_detection" output="screen">
+    <param name="ultrasonic_topic" value="/ultrasonics/left"/>
+    <param name="threshold" value="$(arg side_treshold)"/>
+  </node>
+  <node pkg="ultrasonic_detectors" type="ultrasonic_obj_detector.py" name="ultrasonic_right_detection" output="screen">
+    <param name="ultrasonic_topic" value="/ultrasonics/right"/>
+    <param name="threshold" value="$(arg side_treshold)"/>
+  </node>
+
+  <!-- left ultrasonics -->
+  <node pkg="ultrasonic_detectors" type="ultrasonic_obj_detector.py" name="ultrasonic_front_left_detection" output="screen">
+    <param name="ultrasonic_topic" value="/ultrasonics/front_left"/>
+    <param name="threshold" value="$(arg front_treshold)"/>
+  </node>
+    <node pkg="ultrasonic_detectors" type="ultrasonic_obj_detector.py" name="ultrasonic_front_left_side_detection" output="screen">
+    <param name="ultrasonic_topic" value="/ultrasonics/front_left_side"/>
+    <param name="threshold" value="$(arg front_side_treshold)"/>
+  </node>
+
+  <!-- left ultrasonics -->
+  <node pkg="ultrasonic_detectors" type="ultrasonic_obj_detector.py" name="ultrasonic_front_right_detection" output="screen">
+    <param name="ultrasonic_topic" value="/ultrasonics/front_right"/>
+    <param name="threshold" value="$(arg front_treshold)"/>
+  </node>
+    <node pkg="ultrasonic_detectors" type="ultrasonic_obj_detector.py" name="ultrasonic_front_right_side_detection" output="screen">
+    <param name="ultrasonic_topic" value="/ultrasonics/front_right_side"/>
+    <param name="threshold" value="$(arg front_side_treshold)"/>
   </node>
 </launch>
