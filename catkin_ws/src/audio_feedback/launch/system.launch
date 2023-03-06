@@ -9,7 +9,7 @@
   
   <!-- i2c and ultrasonics -->
   <node pkg="i2c" type="i2c_node" name="i2c_node" output="screen"/>
-  <!-- <include file="$(find ultrasonic_detectors)/launch/object_detectors.launch"/> -->
+  <include file="$(find ultrasonic_detectors)/launch/object_detectors.launch"/>
 
   <!-- LiDAR Detection -->
   <node pkg="lidar" type="plane_detector" name="plane_detection" output="screen"/>
