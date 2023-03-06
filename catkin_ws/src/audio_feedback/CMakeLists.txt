@@ -36,15 +36,6 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
-# add_executable(${PROJECT_NAME}_node
-
-# )
-
-
-
-# target_link_libraries(${PROJECT_NAME}_node
-#   ${catkin_LIBRARIES}
-# )
 
 catkin_install_python(PROGRAMS
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
