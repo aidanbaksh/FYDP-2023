@@ -3,9 +3,7 @@ Panels:
     Help Height: 138
     Name: Displays
     Property Tree Widget:
-      Expanded:
-        - /Plame1
-        - /Curb1
+      Expanded: ~
       Splitter Ratio: 0.5
     Tree Height: 665
   - Class: rviz/Selection
@@ -25,7 +23,7 @@ Panels:
   - Class: rviz/Time
     Name: Time
     SyncMode: 0
-    SyncSource: merged
+    SyncSource: ground_plane
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -247,7 +245,7 @@ Visualization Manager:
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Min Color: 0; 0; 0
-      Name: Plame
+      Name: ground_plane
       Position Transformer: XYZ
       Queue Size: 10
       Selectable: true
@@ -275,7 +273,7 @@ Visualization Manager:
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Min Color: 0; 0; 0
-      Name: Curb
+      Name: curb
       Position Transformer: XYZ
       Queue Size: 10
       Selectable: true
@@ -303,7 +301,7 @@ Visualization Manager:
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Min Color: 0; 0; 0
-      Name: PointCloud2
+      Name: objects
       Position Transformer: XYZ
       Queue Size: 10
       Selectable: true
@@ -359,9 +357,9 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.209795743227005
+      Pitch: 1.1347954273223877
       Target Frame: <Fixed Frame>
-      Yaw: 0.8803982734680176
+      Yaw: 2.700397491455078
     Saved:
       - Class: rviz/Orbit
         Distance: 10
