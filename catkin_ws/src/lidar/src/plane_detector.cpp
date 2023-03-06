@@ -2,6 +2,8 @@
 #include <ros/ros.h>
 
 #include <sensor_msgs/PointCloud2.h>
+#include <audio_feedback/LidarCurb.h>
+#include <audio_feedback/LidarObject.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/ModelCoefficients.h>
 #include <pcl/io/pcd_io.h>
@@ -26,6 +28,9 @@ ros::Publisher pub_ng;
 ros::Publisher pub_curb_cloud;
 ros::Publisher pub_avg_cloud;
 ros::Publisher pub_object_cloud;
+
+ros::Publisher pub_curb;
+ros::Publisher pub_objects;
 
 std::pair<pcl::PointCloud<pcl::PointXYZ>::Ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr> seperate_clouds(pcl::PointIndices::Ptr inliers, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud)
 {
@@ -85,6 +90,11 @@ void find_objects(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud){
     ec.extract(cluster_indices);
     //std::cout<< "num cluster: " << cluster_indices.size() <<" dude size pls: " << std::endl;
     pcl::PointCloud<pcl::PointXYZ>::Ptr output_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+    audio_feedback::LidarObject objectMsg;
+    objectMsg.front = false;
+    objectMsg.front_right = false;
+    objectMsg.front_left = false;
+    objectMsg.back = false;
     for(int i =0; i<cluster_indices.size(); i++){
       //std::cout<<cluster_indices[i].indices.size()<< std::endl;
       if(cluster_indices[i].indices.size() > 500){
@@ -100,9 +110,20 @@ void find_objects(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud){
         double objCenterX = xObjSum/objPCounter;
         double objCenterY = yObjSum/objPCounter;
         std::cout<<"obj x: " << objCenterX << " obj Y " << objCenterY << " size " << cluster_indices[i].indices.size() <<std::endl;
+        if(objCenterX < 0){
+          objectMsg.back = true;
+        }else{
+          if(objCenterY < -0.25){
+            objectMsg.front_right = true;
+          }else if(objCenterY > 0.25){
+            objectMsg.front_left = true;
+          }else{
+            objectMsg.front = true;
+          }
+        }
       }
     }
-    
+    pub_objects.publish(objectMsg);
     pcl::PCLPointCloud2 test;
     pcl::toPCLPointCloud2(*output_cloud, test);
     test.header.frame_id = "wheelchair";
@@ -207,20 +228,28 @@ void find_curbs (pcl::PCLPointCloud2::Ptr cloud_blob)
         // }else{
         //   std::cout << "Curb down detected ";
         // }
+        audio_feedback::LidarCurb curbMessage;
+        curbMessage.front = 0;
+        curbMessage.front_right = 0;
+        curbMessage.front_left = 0;
+        curbMessage.back = 0;
         std::cout << "Curb detected " << std::endl;
-        if(curbCenterX > 0){
-          std::cout << "front ";
-        }else{
-          std::cout << "back ";
+        if(curbCenterX < 0){
+          curbMessage.back = 1;
+          std::cout << "back center";
         }
-        if(curbCenterY > 0.2){
-          std::cout << "left";
-        }else if(curbCenterY < -0.2){
-          std::cout << "right";
+        if(curbCenterY > 0.25){
+          curbMessage.front_left = 1;
+          std::cout << "front left";
+        }else if(curbCenterY < -0.25){
+          curbMessage.front_right = 1;
+          std::cout << "front right";
         }else{
-          std::cout << "center";
+          curbMessage.front = 1;
+          std::cout << "front center";
         }
         std::cout << std::endl;
+        pub_curb.publish(curbMessage);
         std::pair<pcl::PointCloud<pcl::PointXYZ>::Ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr> curbResult = seperate_clouds(curb_inliers, front_curb);
         pcl::PCLPointCloud2 curb_cloud;
         pcl::toPCLPointCloud2(*(curbResult.second), curb_cloud);
@@ -248,7 +277,7 @@ void find_curbs (pcl::PCLPointCloud2::Ptr cloud_blob)
   }
 }
 
-pcl::PCLPointCloud2::Ptr sumPointClouds(new pcl::PCLPointCloud2);
+pcl::PointCloud<pcl::PointXYZ>::Ptr sumPointClouds(new pcl::PointCloud<pcl::PointXYZ>);
 int counter = 0;
 void cloud_cb(const pcl::PCLPointCloud2ConstPtr& cloud_blob){
   // pcl::PCLPointCloud<pcl::PointXYZ> curCloud;
@@ -273,20 +302,23 @@ void cloud_cb(const pcl::PCLPointCloud2ConstPtr& cloud_blob){
   wheelchair_filter.setNegative(true);
   wheelchair_filter.filter(*wheelchair_removed_cloud);
 
-  pcl::PCLPointCloud2 wheelchair_rm_blob;
-  pcl::toPCLPointCloud2(*wheelchair_removed_cloud, wheelchair_rm_blob);
-  *sumPointClouds += wheelchair_rm_blob;
+  //pcl::PCLPointCloud2 wheelchair_rm_blob;
+  //pcl::toPCLPointCloud2(*wheelchair_removed_cloud, wheelchair_rm_blob);
+  *sumPointClouds += *wheelchair_removed_cloud;
 
   if(counter == 5){
     counter = 0;
+    pcl::PCLPointCloud2::Ptr sum_cloud(new pcl::PCLPointCloud2);
+    pcl::toPCLPointCloud2(*sumPointClouds, *sum_cloud);
+
     pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
     pcl::PCLPointCloud2::Ptr avgPtCloud(new pcl::PCLPointCloud2);
-    sor.setInputCloud(sumPointClouds);
+    sor.setInputCloud(sum_cloud);
     sor.setLeafSize(0.035f, 0.035f, 0.025f);
     sor.filter(*avgPtCloud);
     find_curbs(avgPtCloud);
     pub_avg_cloud.publish(avgPtCloud);
-    sumPointClouds.reset(new pcl::PCLPointCloud2);
+    sumPointClouds.reset(new pcl::PointCloud<pcl::PointXYZ>);
   }
 
   counter++;
@@ -303,6 +335,8 @@ int main (int argc, char** argv)
   pub_ng = nh.advertise<pcl::PCLPointCloud2> ("/not_ground_cloud", 1);
   pub_curb_cloud = nh.advertise<pcl::PCLPointCloud2> ("/curb_cloud", 1);
   pub_object_cloud = nh.advertise<pcl::PCLPointCloud2> ("/object_cloud", 1);
+  pub_curb = nh.advertise<audio_feedback::LidarCurb> ("/lidar_curb_detect", 1);
+  pub_objects = nh.advertise<audio_feedback::LidarObject> ("/lidar_object_detect", 1);
 
   ros::spin ();
 }

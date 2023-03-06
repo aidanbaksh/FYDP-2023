@@ -17,6 +17,7 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   roscpp
   sensor_msgs
+  audio_feedback
 )
 find_package(Boost REQUIRED COMPONENTS system)
 find_package(PCL 1.2 REQUIRED)
@@ -24,7 +25,7 @@ find_package(PCL 1.2 REQUIRED)
 catkin_package(INCLUDE_DIRS include)
 
 include_directories(include)
-include_directories(${catkin_INCLUDE_DIRS} ${PCL_INCLUDE_DIRS})
+include_directories(${catkin_INCLUDE_DIRS} ${PCL_INCLUDE_DIRS} ${audio_feedback_INCLUDE_DIRS})
 
 link_directories(${PCL_LIBRARY_DIRS})
 
@@ -66,4 +67,4 @@ target_link_libraries(plane_detector
     ${catkin_LIBRARIES}
     ${PCL_LIBRARIES})
 
-add_dependencies(plane_detector ${PROJECT_NAME}_generate_messages_cpp)
+add_dependencies(plane_detector ${PROJECT_NAME}_generate_messages_cpp ${catkin_EXPORTED_TARGETS})
