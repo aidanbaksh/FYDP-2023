@@ -25,6 +25,8 @@ I2C_Manager::I2C_Manager(ros::NodeHandle& nh):
     stopped(ATOMIC_FLAG_INIT),
     timer(),
     ultrasonic_publishers(),
+    imu_publisher(),
+    spinner(2),
     bus_fd(-1),
     arduino(),
     imu(),
@@ -124,7 +126,7 @@ void I2C_Manager::close() {
 void I2C_Manager::timer_callback(const ros::TimerEvent&) {
     // spin the node while data is not available
     while (!data_available.test()) {
-        ros::spin();
+        spinner.spin();
     }
 
     // publish ultrasonic data on respective topic

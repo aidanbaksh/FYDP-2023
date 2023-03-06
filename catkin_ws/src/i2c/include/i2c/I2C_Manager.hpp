@@ -114,6 +114,9 @@ private:
     // ROS publishers
     std::array<ros::Publisher, NUM_ULTRASONICS> ultrasonic_publishers;
     ros::Publisher imu_publisher;
+    
+    // needed to avoid being blocking by audio warnings
+    ros::MultiThreadedSpinner spinner; 
 
     // i2c bus file descriptor and devices
     int bus_fd;

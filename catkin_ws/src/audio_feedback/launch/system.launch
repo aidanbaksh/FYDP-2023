@@ -15,7 +15,6 @@
   <node pkg="lidar" type="plane_detector" name="plane_detection" output="screen"/>
   
   <!-- aggregator and audio feedback -->
-  <node pkg="sound_play" type="soundplay_node.py" name="soundplay_node" output="screen"/>
   <node pkg="audio_feedback" type="aggregator_node.py" name="aggregator" output="screen"/>
   <node pkg="audio_feedback" type="audio_feedback_node.py" name="audio_feedback" output="screen"/>
 </launch>

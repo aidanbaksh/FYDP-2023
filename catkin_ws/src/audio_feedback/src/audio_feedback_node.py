@@ -84,7 +84,7 @@ class SoundManager:
         self._last_played_dict[path] = rospy.Time.now()
 
     def setPathFromInputs(self, h_type: HazardType, dir: Direction) -> None:
-        path = os.path.absolute(os.path.join(os.environ.get('AUDIO_FILES_DIR')))
+        path = os.path.abspath(os.path.join(os.environ.get('AUDIO_FILES_DIR'))) + '/'
 
         if h_type == HazardType.CURB:
             path += "curb/curb"
