@@ -10,6 +10,10 @@ from audio_feedback.msg import AudioWarning, LidarCurb, LidarObject, UltrasonicC
 
 from custom_enums import HazardType, Direction, Severity
 
+US_TOPIC_STRING = "ultrasonics/{}/{}_detect"
+LIDAR_TOPIC_STRING = "lidar_{}_detect"
+
+
 
 
 class Aggregator:
@@ -21,47 +25,44 @@ class Aggregator:
 
         # subscribe to the various detection topics
         self._l_US_subscriber = rospy.Subscriber(
-            '/left_us_detect', UltrasonicObject, self._l_US_callback
+            US_TOPIC_STRING.format('left', 'object'), UltrasonicObject, self._l_US_callback
         )
 
         self._r_US_subscriber = rospy.Subscriber(
-            '/right_us_detect', UltrasonicObject, self._r_US_callback
+            US_TOPIC_STRING.format('right', 'object'), UltrasonicObject, self._r_US_callback
         )
 
         self._fl_US_subscriber = rospy.Subscriber(
-            '/front_left_us_detect', UltrasonicObject, self._fl_US_callback
+            US_TOPIC_STRING.format('front_left', 'object'), UltrasonicObject, self._fl_US_callback
         )
 
         self._fr_US_subscriber = rospy.Subscriber(
-            '/front_right_us_detect', UltrasonicObject, self._fr_US_callback
+            US_TOPIC_STRING.format('front_right', 'object'), UltrasonicObject, self._fr_US_callback
         )
 
         self._fls_US_subscriber = rospy.Subscriber(
-            '/front_left_side_us_detect', UltrasonicObject, self._fls_US_callback
+            US_TOPIC_STRING.format('front_left_side', 'object'), UltrasonicObject, self._fls_US_callback
         )
 
         self._frs_US_subscriber = rospy.Subscriber(
-            '/front_right_side_us_detect', UltrasonicObject, self._frs_US_callback
+            US_TOPIC_STRING.format('front_right_side', 'object'), UltrasonicObject, self._frs_US_callback
         )
 
         self._b_US_subscriber = rospy.Subscriber(
-            '/back_us_detect', UltrasonicObject, self._b_US_callback
+            US_TOPIC_STRING.format('back', 'object'), UltrasonicObject, self._b_US_callback
         )
 
         self._lidar_curb_subscriber = rospy.Subscriber(
-            '/lidar_curb_detect', LidarCurb, self._lidar_curb_callback
+            '/lidar/curb_detect', LidarCurb, self._lidar_curb_callback
         )
 
         self._lidar_object_subscriber = rospy.Subscriber(
-            '/lidar_object_detect', LidarObject, self._lidar_curb_callback
+            '/lidar/object_detect', LidarObject, self._lidar_curb_callback
         )
 
         # self._warning_wait_time = rospy.Duration(10)
         # self._curb_warning_times = {dir: rospy.Time.now() for dir in Direction.__members__}
-        # self._object_warning_times = {dir: rospy.Time.now() for dir in Direction.__members__}
-
-
-        
+        # self._object_warning_times = {dir: rospy.Time.now() for dir in Direction.__members__} 
 
     # Ultrasonic callbacks
     def _l_US_callback(self, msg: UltrasonicObject) -> None:

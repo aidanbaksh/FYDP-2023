@@ -18,7 +18,7 @@ class SoundManager:
             '/audio_warnings', AudioWarning, self._audio_warning_callback
         )
 
-        self._sound_handle = SoundClient(blocking=False)
+        self._sound_handle = SoundClient(blocking=True)
         rospy.sleep(0.5)
 
         self._last_played_dict = {}

@@ -335,8 +335,8 @@ int main (int argc, char** argv)
   pub_ng = nh.advertise<pcl::PCLPointCloud2> ("/not_ground_cloud", 1);
   pub_curb_cloud = nh.advertise<pcl::PCLPointCloud2> ("/curb_cloud", 1);
   pub_object_cloud = nh.advertise<pcl::PCLPointCloud2> ("/object_cloud", 1);
-  pub_curb = nh.advertise<audio_feedback::LidarCurb> ("/lidar_curb_detect", 1);
-  pub_objects = nh.advertise<audio_feedback::LidarObject> ("/lidar_object_detect", 1);
+  pub_curb = nh.advertise<audio_feedback::LidarCurb> ("/lidar/curb_detect", 1);
+  pub_objects = nh.advertise<audio_feedback::LidarObject> ("/lidar/object_detect", 1);
 
   ros::spin ();
 }
