@@ -19,14 +19,14 @@ const std::array<std::string, I2C_Manager::NUM_ULTRASONICS> I2C_Manager::ULTRASO
     "/ultrasonics/left",
 };
 
-I2C_Manager::I2C_Manager(ros::NodeHandle& nh):
+I2C_Manager::I2C_Manager(ros::NodeHandle& nh, ros::MultiThreadedSpinner& spin):
     nh(nh),
     data_available(ATOMIC_FLAG_INIT),
     stopped(ATOMIC_FLAG_INIT),
     timer(),
     ultrasonic_publishers(),
     imu_publisher(),
-    spinner(2),
+    spinner(spin),
     bus_fd(-1),
     arduino(),
     imu(),

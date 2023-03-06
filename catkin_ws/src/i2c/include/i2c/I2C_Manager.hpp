@@ -74,7 +74,7 @@ class I2C_Manager {
     inline static const std::string IMU_TOPIC = "/imu";
 
 public:
-    I2C_Manager(ros::NodeHandle&);
+    I2C_Manager(ros::NodeHandle&, ros::MultiThreadedSpinner&);
 
     // disallow copy and move
     I2C_Manager(I2C_Manager &) = delete;
@@ -116,7 +116,7 @@ private:
     ros::Publisher imu_publisher;
     
     // needed to avoid being blocking by audio warnings
-    ros::MultiThreadedSpinner spinner; 
+    ros::MultiThreadedSpinner& spinner; 
 
     // i2c bus file descriptor and devices
     int bus_fd;
