@@ -4,8 +4,6 @@ from enum import Enum
 
 import rospy
 from std_msgs.msg import Float32, Bool
-from sound_play.libsoundplay import SoundClient
-from sound_play.msg import SoundRequest
 from audio_feedback.msg import AudioWarning, LidarCurb, LidarObject, UltrasonicCurb, UltrasonicObject
 
 from custom_enums import HazardType, Direction, Severity

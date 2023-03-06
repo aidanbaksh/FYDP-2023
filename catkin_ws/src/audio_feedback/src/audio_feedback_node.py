@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 
+from playsound import playsound
+
 import rospy
 from std_msgs.msg import Float32, Bool
-from sound_play.libsoundplay import SoundClient
-from sound_play.msg import SoundRequest
 from audio_feedback.msg import AudioWarning
+import os
 
 from custom_enums import HazardType, Direction, Severity
 
@@ -18,8 +19,8 @@ class SoundManager:
             '/audio_warnings', AudioWarning, self._audio_warning_callback
         )
 
-        self._sound_handle = SoundClient(blocking=True)
-        rospy.sleep(0.5)
+        # self._sound_handle = SoundClient(blocking=True)
+        # rospy.sleep(0.5)
 
         self._last_played_dict = {}
         self._node_start_time = rospy.Time.now()
@@ -53,10 +54,11 @@ class SoundManager:
             return False
         
         self.setPathFromInputs(h_type, dir)
-        self.setMessageFromInputs(h_type, dir)
+        # self.setMessageFromInputs(h_type, dir)
         if self.checkTimeDelay(sev):
             print("Playing: {}".format(self._request_path)) #Change to warning/log message
-            self._sound_handle.say(self._request_message)
+            # self._sound_handle.say(self._request_message)
+            playsound(self._request_path)
             self.setLastPlayedTime(self._request_path)
         else:
             # Change to warning/log message
@@ -82,7 +84,7 @@ class SoundManager:
         self._last_played_dict[path] = rospy.Time.now()
 
     def setPathFromInputs(self, h_type: HazardType, dir: Direction) -> None:
-        path = "audio_warnings/"
+        path = os.path.absolute(os.path.join(os.environ.get('AUDIO_FILES_DIR')))
 
         if h_type == HazardType.CURB:
             path += "curb/curb"
