@@ -13,11 +13,13 @@ def main(args=None):
     # read calibrated transforms to file
     transforms = serialize.read()
 
-    # publish stored transforms
-    tf_publisher = tf2_ros.StaticTransformBroadcaster()
-    tf_publisher.sendTransform(transforms)
-    
-    rospy.sleep(5)  # wait for transforms to get published
+    # setup transform broadcaster
+    tf_publisher = tf2_ros.StaticTransformBroadcaster()    
+
+    # publish stored transforms repeatedly for 1 minnute
+    for i in range(20):
+        tf_publisher.sendTransform(transforms)
+        rospy.sleep(3)
 
 
 if __name__ == '__main__':
