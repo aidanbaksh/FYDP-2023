@@ -16,7 +16,7 @@
     <param name="duration" value="$(arg pulse_duration)"/>
     <param name="lidar_num" value="0"/>
     <param name="dist_err_slope" value = "0.001629" type="float"> <!-- in m-->
-    <param name="dist_err_offset" value = "0.038176" "float"> <!-- in m-->
+    <param name="dist_err_offset" value = "0.038176" type="float"> <!-- in m-->
   </node>
   <node pkg="cyglidar_d1" type="cyglidar_pcl_publisher" name="bob" output="screen">
     <param name="port" value="/dev/lidar_left"/>
