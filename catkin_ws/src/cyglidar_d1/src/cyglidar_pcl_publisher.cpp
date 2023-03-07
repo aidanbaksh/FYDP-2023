@@ -253,13 +253,13 @@ void running()
     ros::NodeHandle nh;
     ros::NodeHandle priv_nh("~");
 
-    if (nh.getParam("dist_err_slope", ERROR_SLOPE)){
+    if (priv_nh.getParam("dist_err_slope", ERROR_SLOPE)){
         ROS_INFO("Got param dist_err_slope: %f", ERROR_SLOPE);
     } else {
         ROS_ERROR("Failed to get param 'dist_err_slope'");
     }
 
-    if (nh.getParam("dist_err_offset", ERROR_OFFSET)){
+    if (priv_nh.getParam("dist_err_offset", ERROR_OFFSET)){
         ROS_INFO("Got param dist_err_offset: %f", ERROR_OFFSET);
     } else {
         ROS_ERROR("Failed to get param 'dist_err_offset'");
