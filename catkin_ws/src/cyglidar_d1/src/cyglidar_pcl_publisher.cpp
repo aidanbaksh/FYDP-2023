@@ -31,6 +31,8 @@ uint8_t* bufferPtr;
 
 uint8_t currentBuffer;
 
+float ERROR_SLOPE = 0; float ERROR_OFFSET = 0;
+
 static std::vector<uint32_t> colorArray;
 void colorBuffer()
 {
@@ -245,7 +247,6 @@ void cloudScatter_3D()
 }
 
 int FREQUENCY_LEVEL, PULSE_DURATION, LIDAR_NUM;
-float ERROR_SLOPE = 0; float ERROR_OFFSET = 0;
 void running()
 {
     // Create node handlers and local variables
