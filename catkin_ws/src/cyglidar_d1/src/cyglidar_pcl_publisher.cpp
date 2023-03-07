@@ -205,6 +205,7 @@ void cloudScatter_3D()
 
                 if(distance < CygLiDARD1::Distance::Mode3D::Maximum_Depth_3D)
                 {
+                    distance += distance*ERROR_SLOPE + ERROR_OFFSET;
                     if(PointCloud3D.calcPointCloud(distance, BufferIndex, pos_x, pos_y, pos_z) == eCalculationStatus::SUCCESS)
                     {
                         scan_3D.get()->points[BufferIndex].x = pos_z * MM2M;
@@ -244,11 +245,24 @@ void cloudScatter_3D()
 }
 
 int FREQUENCY_LEVEL, PULSE_DURATION, LIDAR_NUM;
+float ERROR_SLOPE = 0; float ERROR_OFFSET = 0;
 void running()
 {
     // Create node handlers and local variables
     ros::NodeHandle nh;
     ros::NodeHandle priv_nh("~");
+
+    if (nh.getParam("dist_err_slope", ERROR_SLOPE)){
+        ROS_INFO("Got param dist_err_slope: %f", ERROR_SLOPE);
+    } else {
+        ROS_ERROR("Failed to get param 'dist_err_slope'");
+    }
+
+    if (nh.getParam("dist_err_offset", ERROR_OFFSET)){
+        ROS_INFO("Got param dist_err_offset: %f", ERROR_OFFSET);
+    } else {
+        ROS_ERROR("Failed to get param 'dist_err_offset'");
+    }
 
     std::string port;
     int baud_rate;
