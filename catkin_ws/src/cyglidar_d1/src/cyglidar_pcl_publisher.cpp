@@ -253,18 +253,6 @@ void running()
     ros::NodeHandle nh;
     ros::NodeHandle priv_nh("~");
 
-    if (priv_nh.getParam("dist_err_slope", ERROR_SLOPE)){
-        ROS_INFO("Got param dist_err_slope: %f", ERROR_SLOPE);
-    } else {
-        ROS_ERROR("Failed to get param 'dist_err_slope'");
-    }
-
-    if (priv_nh.getParam("dist_err_offset", ERROR_OFFSET)){
-        ROS_INFO("Got param dist_err_offset: %f", ERROR_OFFSET);
-    } else {
-        ROS_ERROR("Failed to get param 'dist_err_offset'");
-    }
-
     std::string port;
     int baud_rate;
     std::string frame_id;
@@ -279,6 +267,18 @@ void running()
     priv_nh.param("set_auto_duration", setAutoDuration, 0);
     priv_nh.param("duration", PULSE_DURATION, 0);
     priv_nh.param("lidar_num", LIDAR_NUM, 0);
+
+    if (priv_nh.getParam("dist_err_slope", ERROR_SLOPE)){
+        ROS_INFO("Got param dist_err_slope: %f", ERROR_SLOPE);
+    } else {
+        ROS_ERROR("Failed to get param 'dist_err_slope' for lidar: %d", LIDAR_NUM);
+    }
+
+    if (priv_nh.getParam("dist_err_offset", ERROR_OFFSET)){
+        ROS_INFO("Got param dist_err_offset: %f", ERROR_OFFSET);
+    } else {
+        ROS_ERROR("Failed to get param 'dist_err_offset' for lidar: %d", LIDAR_NUM);
+    }
 
     // injection run mode
     eRunMode LiDAR_RunMode;
