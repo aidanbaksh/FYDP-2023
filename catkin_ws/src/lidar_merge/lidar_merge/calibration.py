@@ -76,7 +76,7 @@ class Calibration:
 
     """Corrects 2D lidar distance measurement using fit model"""
     def _lidar_distance_offset(self, lidar_distance: float) -> float:
-        return 0.1629 * lidar_distance + 1.8676 + (constants.BACK_MOUNT_LIDAR_TO_FRONT_CM / 100)
+        return 0.1629 * lidar_distance + 1.8676 + constants.BACK_MOUNT_LIDAR_TO_FRONT_CM
 
     def _position_to_distance(self, point: Tuple[float, float, float]) -> float:
         return np.sqrt(point[0]**2 + point[1]**2 + point[2]**2)
