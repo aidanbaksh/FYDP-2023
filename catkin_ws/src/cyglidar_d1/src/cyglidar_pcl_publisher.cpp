@@ -1,6 +1,7 @@
 #include <cyglidar_pcl.h>
 #include "PointCloudMaker.h"
 #include "Constants_CygLiDAR_D1.h"
+#include <cmath>
 
 int RunMode;        // select run mode {2D(0), 3D(1), Dual(2)}
 int setAutoDuration; // select Auto (1) or Fixed(0)
@@ -32,7 +33,7 @@ uint8_t* bufferPtr;
 uint8_t currentBuffer;
 
 float ERROR_SLOPE = 0; float ERROR_OFFSET = 0;
-float FILT_COS_HORIZ = 1; float FILT_COS_VERT = 1;
+float FILT_COS_HORIZ = 0; float FILT_COS_VERT = 0;
 
 static std::vector<uint32_t> colorArray;
 void colorBuffer()
@@ -211,9 +212,9 @@ void cloudScatter_3D()
                     distance += distance*ERROR_SLOPE + ERROR_OFFSET;
                     if(PointCloud3D.calcPointCloud(distance, BufferIndex, pos_x, pos_y, pos_z) == eCalculationStatus::SUCCESS)
                     {
-                        float cos_horiz = pos_z / (pos_z*pos_z + pos_x*pos_x);
-                        float cos_vert = pos_z / (pos_z*pos_z + pos_y*pos_y);
-                        if (cos_vert < FILT_COS_VERT && cos_horiz < FILT_COS_HORIZ)
+                        float cos_horiz = pos_z / std::sqrt(pos_z*pos_z + pos_x*pos_x);
+                        float cos_vert = pos_z / std::sqrt(pos_z*pos_z + pos_y*pos_y);
+                        if (cos_vert > FILT_COS_VERT && cos_horiz > FILT_COS_HORIZ)
                         {
                             scan_3D.get()->points[BufferIndex].x = pos_z * MM2M;
                             scan_3D.get()->points[BufferIndex].y = -pos_x * MM2M;
