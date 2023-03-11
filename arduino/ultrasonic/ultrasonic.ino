@@ -94,7 +94,7 @@ void loop() {
 
   // compute distance from pulse duration
   for (size_t i = 0; i < NUM_ULTRASONICS; ++i) {
-    float distance = 255;
+    float distance = UINT8_MAX;
     if (pulses[i].connected) {
       long duration = pulses[i].end - pulses[i].start;
       // divide by 2 since sound wave has to travel out and back
