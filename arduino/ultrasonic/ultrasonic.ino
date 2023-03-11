@@ -19,6 +19,8 @@ constexpr unsigned int ECHO[NUM_ULTRASONICS] = {
 
 constexpr double SPEED_OF_SOUND = 343.0 * 100 / 1000000; // m/s to cm/s to cm/microsecond
 
+constexpr long ECHO_START_TIMEOUT_MICROS = 2250; // millis to micros
+
 // data that is sent over i2c on request
 uint8_t ultrasonic_distances[NUM_ULTRASONICS];
 
@@ -33,15 +35,14 @@ void setup() {
   Wire.begin(I2C_ADDR);
   Wire.onRequest(handle_i2c_request); // register event
 
-  if constexpr (DEBUG) {
-    Serial.begin(9600);
-  }
+  Serial.begin(9600);
 }
 
 struct PulseInfo {
   long start = micros();
   long end;
   bool complete = false;
+  bool connected = true;
 };
 
 void loop() {
@@ -54,19 +55,28 @@ void loop() {
   delayMicroseconds(10);
   digitalWrite(TRIGGER, LOW);
 
+  // keep track of start and end of each pulse
+  PulseInfo pulses[NUM_ULTRASONICS];
+
+  long trigger_start = micros();
+
   // wait for all sensors to send pulse
-  bool all_high = false;
-  while (!all_high) {
-    all_high = true;
+  bool all_pulses_sent = false;
+  while (!all_pulses_sent) {
+    all_pulses_sent = true;
     for (size_t i = 0; i < NUM_ULTRASONICS; ++i) {
       if (digitalRead(ECHO[i]) == LOW) {
-        all_high = false;
+        if (micros() - trigger_start > ECHO_START_TIMEOUT_MICROS) {
+          // print warning later to avoid messing with time of flight reading
+          pulses[i].connected = false;
+        } else {
+          all_pulses_sent = false;
+        }
+      } else {
+        pulses[i].start = micros();
       }
     }
   }
-
-  // keep track of start and end of each pulse
-  PulseInfo pulses[NUM_ULTRASONICS];
 
   // wait for all echos to go low, keep tracking of duration of pulse
   bool all_complete = false;
@@ -84,9 +94,15 @@ void loop() {
 
   // compute distance from pulse duration
   for (size_t i = 0; i < NUM_ULTRASONICS; ++i) {
-    long duration = pulses[i].end - pulses[i].start;
-    // divide by 2 since sound wave has to travel out and back
-    ultrasonic_distances[i] = duration * SPEED_OF_SOUND / 2;
+    float distance = 255;
+    if (pulses[i].connected) {
+      long duration = pulses[i].end - pulses[i].start;
+      // divide by 2 since sound wave has to travel out and back
+      distance = duration * SPEED_OF_SOUND / 2;
+    } else {
+      Serial.println("WARNING: sensor " + String(i) + " is disconnected!");
+    }
+    ultrasonic_distances[i] = distance;
 
     if constexpr (DEBUG) {
       Serial.print("Sensor " + String(i) + ": ");
