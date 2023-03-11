@@ -58,7 +58,7 @@ namespace CygLiDARD1
 
 		namespace Mode3D
 		{
-			const uint16_t Minimum_Depth_2D = 50;		// unit : mm, added by Aidan
+			const uint16_t Minimum_Depth_3D = 50;		// unit : mm, added by Aidan
 			const uint16_t Maximum_Depth_3D = 3000;		// unit : mm
 
 			namespace ErrorCode
