@@ -32,6 +32,7 @@ uint8_t* bufferPtr;
 uint8_t currentBuffer;
 
 float ERROR_SLOPE = 0; float ERROR_OFFSET = 0;
+float FILT_COS_HORIZ = 1; float FILT_COS_VERT = 1;
 
 static std::vector<uint32_t> colorArray;
 void colorBuffer()
@@ -205,17 +206,30 @@ void cloudScatter_3D()
                 BufferIndex = x + (CygLiDARD1::Sensor::Width * y);
                 uint16_t distance = DistanceBuffer[BufferIndex];
 
-                if(distance < CygLiDARD1::Distance::Mode3D::Maximum_Depth_3D)
+                if(CygLiDARD1::Distance::Mode3D::Minimum_Depth_3D < distance && distance < CygLiDARD1::Distance::Mode3D::Maximum_Depth_3D)
                 {
                     distance += distance*ERROR_SLOPE + ERROR_OFFSET;
                     if(PointCloud3D.calcPointCloud(distance, BufferIndex, pos_x, pos_y, pos_z) == eCalculationStatus::SUCCESS)
                     {
-                        scan_3D.get()->points[BufferIndex].x = pos_z * MM2M;
-                        scan_3D.get()->points[BufferIndex].y = -pos_x * MM2M;
-                        scan_3D.get()->points[BufferIndex].z = -pos_y * MM2M;
-                        uint32_t rgb_3D = colorArray[((int)pos_y / 2) % colorArray.size()];
-                        scan_3D.get()->points[BufferIndex].rgb = *reinterpret_cast<float*>(&rgb_3D);
-                        scan_3D.get()->points[BufferIndex].a = 255;
+                        float cos_horiz = pos_z / (pos_z*pos_z + pos_x*pos_x);
+                        float cos_vert = pos_z / (pos_z*pos_z + pos_y*pos_y);
+                        if (cos_vert < FILT_COS_VERT && cos_horiz < FILT_COS_HORIZ)
+                        {
+                            scan_3D.get()->points[BufferIndex].x = pos_z * MM2M;
+                            scan_3D.get()->points[BufferIndex].y = -pos_x * MM2M;
+                            scan_3D.get()->points[BufferIndex].z = -pos_y * MM2M;
+                            uint32_t rgb_3D = colorArray[((int)pos_y / 2) % colorArray.size()];
+                            scan_3D.get()->points[BufferIndex].rgb = *reinterpret_cast<float*>(&rgb_3D);
+                            scan_3D.get()->points[BufferIndex].a = 255;
+                        }
+                        else
+                        {
+                            scan_3D.get()->points[BufferIndex].x = 0;
+                            scan_3D.get()->points[BufferIndex].y = 0;
+                            scan_3D.get()->points[BufferIndex].z = 0;
+                            scan_3D.get()->points[BufferIndex].rgb = 0;
+                            scan_3D.get()->points[BufferIndex].a = 0;
+                        }
                     }
                     else
                     {
@@ -268,6 +282,7 @@ void running()
     priv_nh.param("duration", PULSE_DURATION, 0);
     priv_nh.param("lidar_num", LIDAR_NUM, 0);
 
+    // Aidan's custom params
     if (priv_nh.getParam("dist_err_slope", ERROR_SLOPE)){
         ROS_INFO("Got param dist_err_slope: %f", ERROR_SLOPE);
     } else {
@@ -278,6 +293,16 @@ void running()
         ROS_INFO("Got param dist_err_offset: %f", ERROR_OFFSET);
     } else {
         ROS_ERROR("Failed to get param 'dist_err_offset' for lidar: %d", LIDAR_NUM);
+    }
+    if (priv_nh.getParam("filt_cos_horiz", FILT_COS_HORIZ)){
+        ROS_INFO("Got param filt_cos_horiz: %f", FILT_COS_HORIZ);
+    } else {
+        ROS_ERROR("Failed to get param 'filt_cos_horiz' for lidar: %d", LIDAR_NUM);
+    }
+    if (priv_nh.getParam("filt_cos_vert", FILT_COS_VERT)){
+        ROS_INFO("Got param filt_cos_vert: %f", FILT_COS_VERT);
+    } else {
+        ROS_ERROR("Failed to get param 'filt_cos_vert' for lidar: %d", LIDAR_NUM);
     }
 
     // injection run mode

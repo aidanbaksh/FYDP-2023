@@ -17,6 +17,8 @@
     <param name="lidar_num" value="0"/>
     <!--<param name="dist_err_slope" value = "0.0802"/>--> <!-- in mm/mm -->
     <!--<param name="dist_err_offset" value = "61.554"/>--> <!-- in mm -->
+    <!--<param name="filt_cos_horiz value = "0.5"/>--> <!-- in mm/mm -->
+    <!--<param name="filt_cos_vert" value = "0.866"/>--> <!-- in mm/mm -->
   </node>
   <node pkg="cyglidar_d1" type="cyglidar_pcl_publisher" name="bob" output="screen">
     <param name="port" value="/dev/lidar_left"/>
