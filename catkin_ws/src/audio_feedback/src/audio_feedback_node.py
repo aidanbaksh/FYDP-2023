@@ -62,6 +62,7 @@ class SoundManager:
             self.setLastPlayedTime(self._request_path)
         else:
             # Change to warning/log message
+            return True
             print("Received message ({},{},{}), but was last played too recently, so not reapeating.".format(h_type, dir, sev))
         
         return True
