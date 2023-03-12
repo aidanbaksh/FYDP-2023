@@ -62,7 +62,7 @@ namespace addr {
 
 
 class I2C_Manager {
-    static constexpr size_t PUBLISH_INTERVAL_MS = 20; // 20Hz
+    static constexpr double PUBLISH_INTERVAL_MS = 50; // 20Hz
 
     static constexpr unsigned int BUS_NUM = 0;
     inline static const std::string BUS_NAME = "/dev/i2c-" + std::to_string(I2C_Manager::BUS_NUM);
@@ -74,7 +74,7 @@ class I2C_Manager {
     inline static const std::string IMU_TOPIC = "/imu";
 
 public:
-    I2C_Manager(ros::NodeHandle&, ros::MultiThreadedSpinner&);
+    I2C_Manager(ros::NodeHandle&);
 
     // disallow copy and move
     I2C_Manager(I2C_Manager &) = delete;
@@ -101,9 +101,6 @@ private:
     // thread that actually communicates with devices
     void get_data();
 
-    // convert acceleration to angle
-    std::pair<double, double> get_angle(const int16_t, const int16_t, const int16_t) const;
-
     // ROS node handle
     ros::NodeHandle& nh;
 
@@ -114,9 +111,6 @@ private:
     // ROS publishers
     std::array<ros::Publisher, NUM_ULTRASONICS> ultrasonic_publishers;
     ros::Publisher imu_publisher;
-    
-    // needed to avoid being blocking by audio warnings
-    ros::MultiThreadedSpinner& spinner; 
 
     // i2c bus file descriptor and devices
     int bus_fd;

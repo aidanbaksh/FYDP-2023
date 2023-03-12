@@ -8,6 +8,8 @@ add_compile_options(-std=c++2a)
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   std_msgs
+  geometry_msgs
+  message_generation
 )
 
 # build libi2c
@@ -20,6 +22,20 @@ set_target_properties(libi2c PROPERTIES
                       IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/libi2c/libi2c.a
                       INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR}/libi2c/include)
 
+################################################
+## Declare ROS messages, services and actions ##
+################################################
+# Generate messages in the 'msg' folder
+add_message_files(
+  FILES
+  IMU.msg
+)
+
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+  geometry_msgs
+)
 
 ###################################
 ## catkin specific configuration ##
@@ -33,7 +49,7 @@ set_target_properties(libi2c PROPERTIES
 catkin_package(
    INCLUDE_DIRS include
 #  LIBRARIES i2c
-   CATKIN_DEPENDS roscpp
+   CATKIN_DEPENDS roscpp message_runtime
 #  DEPENDS system_lib
 )
 

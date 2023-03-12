@@ -1,4 +1,5 @@
 #include "i2c/I2C_Manager.hpp"
+#include "i2c/IMU.h"
 
 #include <cassert>
 #include <cstring>  // needed for std::memset
@@ -19,14 +20,13 @@ const std::array<std::string, I2C_Manager::NUM_ULTRASONICS> I2C_Manager::ULTRASO
     "/ultrasonics/left",
 };
 
-I2C_Manager::I2C_Manager(ros::NodeHandle& nh, ros::MultiThreadedSpinner& spin):
+I2C_Manager::I2C_Manager(ros::NodeHandle& nh):
     nh(nh),
     data_available(ATOMIC_FLAG_INIT),
     stopped(ATOMIC_FLAG_INIT),
     timer(),
     ultrasonic_publishers(),
     imu_publisher(),
-    spinner(spin),
     bus_fd(-1),
     arduino(),
     imu(),
@@ -44,7 +44,7 @@ I2C_Manager::I2C_Manager(ros::NodeHandle& nh, ros::MultiThreadedSpinner& spin):
     for (size_t i = 0; i < NUM_ULTRASONICS; ++i) {
         ultrasonic_publishers[i] = nh.advertise<std_msgs::Float32>(ULTRASONIC_TOPICS[i], 5);
     }
-    imu_publisher = nh.advertise<std_msgs::Float32>(IMU_TOPIC, 5);
+    imu_publisher = nh.advertise<i2c::IMU>(IMU_TOPIC, 5);
 
     // clear data buffer
     std::memset(ultrasonic_buffer, 0, sizeof(ultrasonic_buffer));
@@ -126,7 +126,7 @@ void I2C_Manager::close() {
 void I2C_Manager::timer_callback(const ros::TimerEvent&) {
     // spin the node while data is not available
     while (!data_available.test()) {
-        spinner.spin();
+        ros::spin();
     }
 
     // publish ultrasonic data on respective topic
@@ -137,19 +137,14 @@ void I2C_Manager::timer_callback(const ros::TimerEvent&) {
     }
 
     // publish imu data
-    // TODO: construct message and publish
-    // get pitch/roll
-    const std::pair<double, double> angle = std::apply(
-        std::bind_front(&I2C_Manager::get_angle, this), imu_accel
-    );
-    std_msgs::Float32 imu_msg;
-    imu_msg.data = angle.first;
+    i2c::IMU imu_msg;
+    imu_msg.acceleration.x = std::get<0>(imu_accel);
+    imu_msg.acceleration.y = std::get<0>(imu_accel);
+    imu_msg.acceleration.z = std::get<0>(imu_accel);
+    imu_msg.gyro.x = std::get<0>(imu_gyro);
+    imu_msg.gyro.y = std::get<0>(imu_gyro);
+    imu_msg.gyro.z = std::get<0>(imu_gyro);
     imu_publisher.publish(imu_msg);
-
-    // print data
-    // std::cout << "Angle: Pitch = " << angle.first << " | Roll = " << angle.second << std::endl;
-    // std::cout << "Accelerometer: X = " << std::get<0>(imu_accel) << " | Y = " << std::get<1>(imu_accel) << " | Z = " << std::get<2>(imu_accel) << std::endl;
-    // std::cout << "Gyroscope: X = " << std::get<0>(imu_gyro) << " | Y = " << std::get<1>(imu_gyro) << " | Z = " << std::get<2>(imu_gyro) << std::endl;
 
     // consumed the data, no longer available
     data_available.clear();
@@ -166,25 +161,25 @@ void I2C_Manager::get_data() {
             ROS_ERROR("i2c error when reading ultrasonics!\n");
         }
 
-        // // read imu acceleration 
-        // if (!read_device(imu, addr::imu::internal::ACCEL_OUT, imu_buffer)) {
-        //     ROS_ERROR("i2c error when reading imu acceleration!\n");
-        // }
-        // imu_accel = std::make_tuple(
-        //     double(imu_buffer[0] << 8 | imu_buffer[1]) / imu_corrections::ACCEL_SCALE * imu_corrections::SENSORS_GRAVITY_STANDARD,
-        //     double(imu_buffer[2] << 8 | imu_buffer[3]) / imu_corrections::ACCEL_SCALE * imu_corrections::SENSORS_GRAVITY_STANDARD,
-        //     double(imu_buffer[4] << 8 | imu_buffer[5]) / imu_corrections::ACCEL_SCALE * imu_corrections::SENSORS_GRAVITY_STANDARD
-        // );
+        // read imu acceleration 
+        if (!read_device(imu, addr::imu::internal::ACCEL_OUT, imu_buffer)) {
+            ROS_ERROR("i2c error when reading imu acceleration!\n");
+        }
+        imu_accel = std::make_tuple(
+            double(imu_buffer[0] << 8 | imu_buffer[1]) / imu_corrections::ACCEL_SCALE * imu_corrections::SENSORS_GRAVITY_STANDARD,
+            double(imu_buffer[2] << 8 | imu_buffer[3]) / imu_corrections::ACCEL_SCALE * imu_corrections::SENSORS_GRAVITY_STANDARD,
+            double(imu_buffer[4] << 8 | imu_buffer[5]) / imu_corrections::ACCEL_SCALE * imu_corrections::SENSORS_GRAVITY_STANDARD
+        );
 
-        // // read imu gyro
-        // if (!read_device(imu, addr::imu::internal::GYRO_OUT, imu_buffer)) {
-        //     ROS_ERROR("i2c error when reading imu gyro!\n");
-        // }
-        // imu_gyro = std::make_tuple(
-        //     (imu_buffer[0] << 8 | imu_buffer[1]) / imu_corrections::GYRO_SCALE * imu_corrections::SENSORS_DPS_TO_RADS,
-        //     (imu_buffer[2] << 8 | imu_buffer[3]) / imu_corrections::GYRO_SCALE * imu_corrections::SENSORS_DPS_TO_RADS,
-        //     (imu_buffer[4] << 8 | imu_buffer[5]) / imu_corrections::GYRO_SCALE * imu_corrections::SENSORS_DPS_TO_RADS
-        // );
+        // read imu gyro
+        if (!read_device(imu, addr::imu::internal::GYRO_OUT, imu_buffer)) {
+            ROS_ERROR("i2c error when reading imu gyro!\n");
+        }
+        imu_gyro = std::make_tuple(
+            (imu_buffer[0] << 8 | imu_buffer[1]) / imu_corrections::GYRO_SCALE * imu_corrections::SENSORS_DPS_TO_RADS,
+            (imu_buffer[2] << 8 | imu_buffer[3]) / imu_corrections::GYRO_SCALE * imu_corrections::SENSORS_DPS_TO_RADS,
+            (imu_buffer[4] << 8 | imu_buffer[5]) / imu_corrections::GYRO_SCALE * imu_corrections::SENSORS_DPS_TO_RADS
+        );
 
         // std::cout
         //     << std::fixed
@@ -232,12 +227,6 @@ bool I2C_Manager::configure_imu(unsigned int iaddr, int8_t val) {
         return false;
     }
     return true;
-}
-
-inline std::pair<double, double> I2C_Manager::get_angle(const int16_t x, const int16_t y, const int16_t z) const {
-    const double pitch = atan(x/sqrt((y*y) + (z*z))) * (180.0/M_PI);
-    const double roll = atan(y/sqrt((x*x) + (z*z))) * (180.0/M_PI);
-    return std::make_pair(pitch, roll);
 }
 
 }
