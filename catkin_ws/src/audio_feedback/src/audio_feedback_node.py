@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+from multiprocessing.pool import ThreadPool
+
 from playsound import playsound
 
 import rospy
@@ -13,6 +15,8 @@ from custom_enums import HazardType, Direction, Severity
 class SoundManager:
     def __init__(self):
         rospy.init_node('audio_feedback')
+
+        self._audio_player = ThreadPool(1)
 
         # subscribe to the audio_warnings topic
         self._audio_warning_subscriber = rospy.Subscriber(
@@ -57,8 +61,7 @@ class SoundManager:
         # self.setMessageFromInputs(h_type, dir)
         if self.checkTimeDelay(sev):
             print("Playing: {}".format(self._request_path)) #Change to warning/log message
-            # self._sound_handle.say(self._request_message)
-            playsound(self._request_path)
+            self._audio_player.apply_async(playsound, self._request_path)
             self.setLastPlayedTime(self._request_path)
         else:
             # Change to warning/log message
@@ -145,8 +148,3 @@ class SoundManager:
 if __name__ == '__main__':
     manager = SoundManager()
     rospy.spin()
-
-
-
-
-
