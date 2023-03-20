@@ -43,7 +43,7 @@ class Calibration:
     BACK_MOUNT_HEIGHT_GUESS: float = 25
 
     MAX_NUM_BACK_ULTRASONIC_READINGS: int = 50
-    MIN_NUM_BACK_LIDAR_READINGS: int = 5
+    MIN_NUM_BACK_LIDAR_READINGS: int = 10
 
     def __init__(self):
         rospy.init_node('calibrate_lidar_transforms')
@@ -60,7 +60,7 @@ class Calibration:
         self._back_lidar2d_subscriber = rospy.Subscriber(
             constants.BACK_LIDAR_2D_TOPIC, PointCloud2, self._back_lidar2d_callback
         )
-         # keep track of distances from back lidar
+        # keep track of distances from back lidar
         self._back_lidar_distances = collections.deque([], Calibration.MIN_NUM_BACK_LIDAR_READINGS)
 
         # publisher of calibrated transforms
@@ -225,147 +225,148 @@ class Calibration:
         back_ultrasonic_dist = float(np.mean(self._back_ultrasonic_distances))
         back_lidar_dist = float(np.mean(self._back_lidar_distances)) * 100  # convert from m to cm
 
-        # add calculated correction factor to lidar distance
-        back_lidar_dist += self._lidar_distance_offset(back_lidar_dist)
+        # # add calculated correction factor to lidar distance
+        # back_lidar_dist += self._lidar_distance_offset(back_lidar_dist)
 
         # print measured distances
-        rospy.loginfo("Back Ultrasonic Distance (cm): %f", back_ultrasonic_dist)
+        rospy.loginfo("Back Ultrasonic Distances (cm): %f\n\n", back_ultrasonic_dist)
+        rospy.loginfo("Back Ultrasonic Distance (cm): %f\n\n", back_ultrasonic_dist)
         rospy.loginfo("Back Lidar Distance (cm): %f", back_lidar_dist)
 
-        # add offsets to intersection point
-        back_ultrasonic_dist += constants.BACK_MOUNT_ULTRASONIC_TO_INTERSECTION_CM
-        back_lidar_dist += constants.BACK_MOUNT_LIDAR_TO_INTERSECTION_CM
+        # # add offsets to intersection point
+        # back_ultrasonic_dist += constants.BACK_MOUNT_ULTRASONIC_TO_INTERSECTION_CM
+        # back_lidar_dist += constants.BACK_MOUNT_LIDAR_TO_INTERSECTION_CM
 
-        # compute angle and distance to ground
-        def back_angle_and_height(x: Tuple[float, float]) -> np.ndarray:
-            alpha, h = x
-            return (
-                h/back_ultrasonic_dist - np.cos(np.deg2rad(alpha)),
-                h/back_lidar_dist - np.cos(np.deg2rad(constants.BACK_MOUNT_LIDAR_ULTRASONIC_ANGLE))
-            )
-        alpha, sensor_intersection_height = scipy.optimize.fsolve(
-            back_angle_and_height,
-            (Calibration.BACK_MOUNT_PITCH_GUESS, Calibration.BACK_MOUNT_HEIGHT_GUESS)
-        )
-        back_lidar_pitch = alpha + constants.BACK_MOUNT_LIDAR_ULTRASONIC_ANGLE
+        # # compute angle and distance to ground
+        # def back_angle_and_height(x: Tuple[float, float]) -> np.ndarray:
+        #     alpha, h = x
+        #     return (
+        #         h/back_ultrasonic_dist - np.cos(np.deg2rad(alpha)),
+        #         h/back_lidar_dist - np.cos(np.deg2rad(constants.BACK_MOUNT_LIDAR_ULTRASONIC_ANGLE))
+        #     )
+        # alpha, sensor_intersection_height = scipy.optimize.fsolve(
+        #     back_angle_and_height,
+        #     (Calibration.BACK_MOUNT_PITCH_GUESS, Calibration.BACK_MOUNT_HEIGHT_GUESS)
+        # )
+        # back_lidar_pitch = alpha + constants.BACK_MOUNT_LIDAR_ULTRASONIC_ANGLE
 
-        rospy.loginfo('Back Pitch Angle (deg): %f', back_lidar_pitch)
-        rospy.loginfo('Sensor Intersection Height (cm): %f', sensor_intersection_height)
+        # rospy.loginfo('Back Pitch Angle (deg): %f', back_lidar_pitch)
+        # rospy.loginfo('Sensor Intersection Height (cm): %f', sensor_intersection_height)
 
-        back_pivot_to_lidar_z_offset = constants.BACK_MOUNT_PIVOT_TO_LIDAR_DIST_CM*np.cos(
-            np.radians(constants.BACK_MOUNT_PIVOT_TO_LIDAR_ANGLE + back_lidar_pitch)
-        )  # should be generally positive
-        back_pivot_to_lidar_x_offset = constants.BACK_MOUNT_PIVOT_TO_LIDAR_DIST_CM*np.sin(
-            np.radians(constants.BACK_MOUNT_PIVOT_TO_LIDAR_ANGLE + back_lidar_pitch)
-        )  # should always be negative
+        # back_pivot_to_lidar_z_offset = constants.BACK_MOUNT_PIVOT_TO_LIDAR_DIST_CM*np.cos(
+        #     np.radians(constants.BACK_MOUNT_PIVOT_TO_LIDAR_ANGLE + back_lidar_pitch)
+        # )  # should be generally positive
+        # back_pivot_to_lidar_x_offset = constants.BACK_MOUNT_PIVOT_TO_LIDAR_DIST_CM*np.sin(
+        #     np.radians(constants.BACK_MOUNT_PIVOT_TO_LIDAR_ANGLE + back_lidar_pitch)
+        # )  # should always be negative
 
-        sensor_intersection_to_lidar_z_offset = (
-            -constants.BACK_MOUNT_ULTRASONIC_TO_INTERSECTION_CM*np.cos(np.radians(back_lidar_pitch))
-        ) 
+        # sensor_intersection_to_lidar_z_offset = (
+        #     -constants.BACK_MOUNT_ULTRASONIC_TO_INTERSECTION_CM*np.cos(np.radians(back_lidar_pitch))
+        # ) 
 
-        # convert calibrated height for the back mount from cm to m
-        sensor_intersection_height /= 100
-        back_pivot_to_lidar_z_offset /= 100
-        back_pivot_to_lidar_x_offset /= 100
-        sensor_intersection_to_lidar_z_offset /= 100
+        # # convert calibrated height for the back mount from cm to m
+        # sensor_intersection_height /= 100
+        # back_pivot_to_lidar_z_offset /= 100
+        # back_pivot_to_lidar_x_offset /= 100
+        # sensor_intersection_to_lidar_z_offset /= 100
 
-        # construct transform for back lidar
-        back_lidar_x_offset = constants.BACK_PIVOT_X_OFFSET + back_pivot_to_lidar_x_offset
-        back_lidar_z_offset = constants.BACK_PIVOT_Z_OFFSET + back_pivot_to_lidar_z_offset
-        back_tf = self._back_lidar_tf_matrix(
-            back_lidar_pitch,
-            np.array([back_lidar_x_offset, 0, back_lidar_z_offset])
-        )
+        # # construct transform for back lidar
+        # back_lidar_x_offset = constants.BACK_PIVOT_X_OFFSET + back_pivot_to_lidar_x_offset
+        # back_lidar_z_offset = constants.BACK_PIVOT_Z_OFFSET + back_pivot_to_lidar_z_offset
+        # back_tf = self._back_lidar_tf_matrix(
+        #     back_lidar_pitch,
+        #     np.array([back_lidar_x_offset, 0, back_lidar_z_offset])
+        # )
 
-        # calculate height of wheelchair frame from ground plane
-        back_lidar_height = sensor_intersection_height + sensor_intersection_to_lidar_z_offset
-        wheelchair_to_ground_z = back_lidar_height - back_pivot_to_lidar_z_offset - constants.BACK_PIVOT_Z_OFFSET
+        # # calculate height of wheelchair frame from ground plane
+        # back_lidar_height = sensor_intersection_height + sensor_intersection_to_lidar_z_offset
+        # wheelchair_to_ground_z = back_lidar_height - back_pivot_to_lidar_z_offset - constants.BACK_PIVOT_Z_OFFSET
 
-        rospy.loginfo('Back Lidar Height (cm): %f', back_lidar_height * 100)
-        rospy.loginfo('Wheelchair to Ground Height (cm): %f', wheelchair_to_ground_z * 100)
+        # rospy.loginfo('Back Lidar Height (cm): %f', back_lidar_height * 100)
+        # rospy.loginfo('Wheelchair to Ground Height (cm): %f', wheelchair_to_ground_z * 100)
 
-        # extract ground planes from each lidar
-        back_ground_plane_eqn = self._get_ground_plane(LiDAR.BACK)
-        left_ground_plane_eqn = self._get_ground_plane(LiDAR.LEFT)
-        right_ground_plane_eqn = self._get_ground_plane(LiDAR.RIGHT)
+        # # extract ground planes from each lidar
+        # back_ground_plane_eqn = self._get_ground_plane(LiDAR.BACK)
+        # left_ground_plane_eqn = self._get_ground_plane(LiDAR.LEFT)
+        # right_ground_plane_eqn = self._get_ground_plane(LiDAR.RIGHT)
 
-        # find rotation to make ground plane equivalent to xy plane
-        e_3 = np.array([0, 0, 1])
+        # # find rotation to make ground plane equivalent to xy plane
+        # e_3 = np.array([0, 0, 1])
 
-        # compute plane normals
-        left_ground_plane_normal = self._get_plane_normal_vector(left_ground_plane_eqn)
-        right_ground_plane_normal = self._get_plane_normal_vector(right_ground_plane_eqn)
+        # # compute plane normals
+        # left_ground_plane_normal = self._get_plane_normal_vector(left_ground_plane_eqn)
+        # right_ground_plane_normal = self._get_plane_normal_vector(right_ground_plane_eqn)
 
-        R_left_ground_plane = self._rotation_matrix_for_plane(left_ground_plane_normal, e_3)
-        R_right_ground_plane = self._rotation_matrix_for_plane(right_ground_plane_normal, e_3)
+        # R_left_ground_plane = self._rotation_matrix_for_plane(left_ground_plane_normal, e_3)
+        # R_right_ground_plane = self._rotation_matrix_for_plane(right_ground_plane_normal, e_3)
 
-        # build transformation matrices from initial guess
-        front_left_tf, front_right_tf = self._front_lidar_tfs_initial_guess()
+        # # build transformation matrices from initial guess
+        # front_left_tf, front_right_tf = self._front_lidar_tfs_initial_guess()
 
-        # apply rotation to align plane
-        front_left_tf = self._apply_rotation_to_tf(front_left_tf, R_left_ground_plane)
-        front_right_tf = self._apply_rotation_to_tf(front_right_tf, R_right_ground_plane)
+        # # apply rotation to align plane
+        # front_left_tf = self._apply_rotation_to_tf(front_left_tf, R_left_ground_plane)
+        # front_right_tf = self._apply_rotation_to_tf(front_right_tf, R_right_ground_plane)
 
-        # calculate distance to ground plane of each lidar
-        back_plane_height = back_ground_plane_eqn[3]
-        left_plane_height = left_ground_plane_eqn[3]
-        right_plane_height = right_ground_plane_eqn[3]
+        # # calculate distance to ground plane of each lidar
+        # back_plane_height = back_ground_plane_eqn[3]
+        # left_plane_height = left_ground_plane_eqn[3]
+        # right_plane_height = right_ground_plane_eqn[3]
 
-        assert(back_plane_height >= 0)
-        assert(left_plane_height >= 0)
-        assert(right_plane_height >= 0)
+        # assert(back_plane_height >= 0)
+        # assert(left_plane_height >= 0)
+        # assert(right_plane_height >= 0)
 
-        left_lidar_z_offset = back_lidar_z_offset + left_plane_height - back_plane_height
-        right_lidar_z_offset = back_lidar_z_offset + right_plane_height - back_plane_height
+        # left_lidar_z_offset = back_lidar_z_offset + left_plane_height - back_plane_height
+        # right_lidar_z_offset = back_lidar_z_offset + right_plane_height - back_plane_height
 
-        # update z offset for left and right lidar
-        front_left_tf[2,3] = left_lidar_z_offset
-        front_right_tf[2,3] = right_lidar_z_offset
+        # # update z offset for left and right lidar
+        # front_left_tf[2,3] = left_lidar_z_offset
+        # front_right_tf[2,3] = right_lidar_z_offset
 
-        rospy.loginfo('Back Z Offset (cm): %f', back_lidar_z_offset * 100)
-        rospy.loginfo('Left Z Offset (cm): %f', left_lidar_z_offset * 100)
-        rospy.loginfo('Right Z Offset (cm): %f', right_lidar_z_offset * 100)
+        # rospy.loginfo('Back Z Offset (cm): %f', back_lidar_z_offset * 100)
+        # rospy.loginfo('Left Z Offset (cm): %f', left_lidar_z_offset * 100)
+        # rospy.loginfo('Right Z Offset (cm): %f', right_lidar_z_offset * 100)
 
-        # wait for 20 while user reorients wheelchair to detect forward orientation
-        rospy.loginfo('Please reorient the mobility device towards a wall...')
-        rospy.sleep(12)
-        rospy.loginfo('Will continue calibration shortly...')
-        rospy.sleep(3)
-        rospy.loginfo('Continuing calibration...')
+        # # wait for 20 while user reorients wheelchair to detect forward orientation
+        # rospy.loginfo('Please reorient the mobility device towards a wall...')
+        # rospy.sleep(12)
+        # rospy.loginfo('Will continue calibration shortly...')
+        # rospy.sleep(3)
+        # rospy.loginfo('Continuing calibration...')
 
-        # extract wall planes from each lidar
-        left_wall_plane_eqn = self._get_wall_plane(LiDAR.LEFT, R_left_ground_plane, wheelchair_to_ground_z + left_lidar_z_offset)
-        right_wall_plane_eqn = self._get_wall_plane(LiDAR.RIGHT, R_right_ground_plane, wheelchair_to_ground_z + right_lidar_z_offset)
+        # # extract wall planes from each lidar
+        # left_wall_plane_eqn = self._get_wall_plane(LiDAR.LEFT, R_left_ground_plane, wheelchair_to_ground_z + left_lidar_z_offset)
+        # right_wall_plane_eqn = self._get_wall_plane(LiDAR.RIGHT, R_right_ground_plane, wheelchair_to_ground_z + right_lidar_z_offset)
 
-        # find rotation to make wall plane normal to x axis
-        e_1 = np.array([1, 0, 0])
+        # # find rotation to make wall plane normal to x axis
+        # e_1 = np.array([1, 0, 0])
 
-        # compute plane normals
-        left_wall_plane_normal = self._get_plane_normal_vector(left_wall_plane_eqn)
-        right_wall_plane_normal = self._get_plane_normal_vector(right_wall_plane_eqn)
+        # # compute plane normals
+        # left_wall_plane_normal = self._get_plane_normal_vector(left_wall_plane_eqn)
+        # right_wall_plane_normal = self._get_plane_normal_vector(right_wall_plane_eqn)
 
-        # ignore z components in rotation
-        left_wall_plane_normal[2] = 0
-        right_wall_plane_normal[2] = 0
+        # # ignore z components in rotation
+        # left_wall_plane_normal[2] = 0
+        # right_wall_plane_normal[2] = 0
 
-        R_left_wall_plane = self._rotation_matrix_for_plane(left_wall_plane_normal, e_1)
-        R_right_wall_plane = self._rotation_matrix_for_plane(right_wall_plane_normal, e_1)
+        # R_left_wall_plane = self._rotation_matrix_for_plane(left_wall_plane_normal, e_1)
+        # R_right_wall_plane = self._rotation_matrix_for_plane(right_wall_plane_normal, e_1)
 
-        # apply rotation to align plane
-        front_left_tf = self._apply_rotation_to_tf(front_left_tf, R_left_wall_plane)
-        front_right_tf = self._apply_rotation_to_tf(front_right_tf, R_right_wall_plane)
+        # # apply rotation to align plane
+        # front_left_tf = self._apply_rotation_to_tf(front_left_tf, R_left_wall_plane)
+        # front_right_tf = self._apply_rotation_to_tf(front_right_tf, R_right_wall_plane)
 
-        # format transforms as geometry_msgs.TransformStamped
-        formatted_tfs = []
-        formatted_tfs.append(self._ground_to_wheelchair(wheelchair_to_ground_z))
-        formatted_tfs.append(self._format_tf(constants.FRONT_LEFT_FRAME, front_left_tf))
-        formatted_tfs.append(self._format_tf(constants.FRONT_RIGHT_FRAME, front_right_tf))
-        formatted_tfs.append(self._format_tf(constants.BACK_FRAME, back_tf))
-        # publish transforms
-        # all have to be published at once due to a bug with StaticTransformBroadcaster
-        # https://answers.ros.org/question/287469/unable-to-publish-multiple-static-transformations-using-tf/
-        self._tf_publisher.sendTransform(formatted_tfs)
-        rospy.loginfo("Published calibrated transforms")
+        # # format transforms as geometry_msgs.TransformStamped
+        # formatted_tfs = []
+        # formatted_tfs.append(self._ground_to_wheelchair(wheelchair_to_ground_z))
+        # formatted_tfs.append(self._format_tf(constants.FRONT_LEFT_FRAME, front_left_tf))
+        # formatted_tfs.append(self._format_tf(constants.FRONT_RIGHT_FRAME, front_right_tf))
+        # formatted_tfs.append(self._format_tf(constants.BACK_FRAME, back_tf))
+        # # publish transforms
+        # # all have to be published at once due to a bug with StaticTransformBroadcaster
+        # # https://answers.ros.org/question/287469/unable-to-publish-multiple-static-transformations-using-tf/
+        # self._tf_publisher.sendTransform(formatted_tfs)
+        # rospy.loginfo("Published calibrated transforms")
 
         # # debugging !!
         # from std_msgs.msg import Header
