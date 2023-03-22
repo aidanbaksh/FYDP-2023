@@ -139,11 +139,11 @@ void I2C_Manager::timer_callback(const ros::TimerEvent&) {
     // publish imu data
     i2c::IMU imu_msg;
     imu_msg.acceleration.x = std::get<0>(imu_accel);
-    imu_msg.acceleration.y = std::get<0>(imu_accel);
-    imu_msg.acceleration.z = std::get<0>(imu_accel);
+    imu_msg.acceleration.y = std::get<1>(imu_accel);
+    imu_msg.acceleration.z = std::get<2>(imu_accel);
     imu_msg.gyro.x = std::get<0>(imu_gyro);
-    imu_msg.gyro.y = std::get<0>(imu_gyro);
-    imu_msg.gyro.z = std::get<0>(imu_gyro);
+    imu_msg.gyro.y = std::get<1>(imu_gyro);
+    imu_msg.gyro.z = std::get<2>(imu_gyro);
     imu_publisher.publish(imu_msg);
 
     // consumed the data, no longer available
@@ -194,7 +194,6 @@ void I2C_Manager::get_data() {
         //     << std::endl;
 
         // std::cout << "Got ultrasonic data:" << std::endl;
-        // for (size_t i = 0; i < NUM_ULTRASONICS; ++i) {
         //     std::cout << unsigned(ultrasonic_buffer[i]) << " ";
         // }
         // std::cout << std::endl;
