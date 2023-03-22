@@ -367,70 +367,70 @@ class Calibration:
         self._tf_publisher.sendTransform(formatted_tfs)
         rospy.loginfo("Published calibrated transforms")
 
-        # # debugging !!
-        # from std_msgs.msg import Header
-        # from geometry_msgs.msg import PolygonStamped, Point32
+        # debugging !!
+        from std_msgs.msg import Header
+        from geometry_msgs.msg import PolygonStamped, Point32
 
-        # frames = [
-        #     constants.BACK_FRAME,
-        #     constants.FRONT_LEFT_FRAME,
-        #     constants.FRONT_RIGHT_FRAME,
-        # ]
-        # topic_postfix = [
-        #     'back',
-        #     'front_left',
-        #     'front_right',
-        # ]
-        # lidars = [LiDAR.BACK, LiDAR.LEFT, LiDAR.RIGHT ]
-        # plane_eqs = [back_ground_plane_eqn, left_wall_plane_eqn, right_wall_plane_eqn]
+        frames = [
+            constants.BACK_FRAME,
+            constants.FRONT_LEFT_FRAME,
+            constants.FRONT_RIGHT_FRAME,
+        ]
+        topic_postfix = [
+            'back',
+            'front_left',
+            'front_right',
+        ]
+        lidars = [LiDAR.BACK, LiDAR.LEFT, LiDAR.RIGHT ]
+        plane_eqs = [back_ground_plane_eqn, left_ground_plane_eqn, right_ground_plane_eqn]
 
-        # filt_pubs = []
-        # plane_pubs = []
+        filt_pubs = []
+        plane_pubs = []
 
-        # filts = []
-        # planes = []
+        filts = []
+        planes = []
 
-        # for i, fr in enumerate(frames):
-        #     # filtered points
-        #     filt_topic = '/filtered_' + topic_postfix[i]
-        #     filt_pubs.append(
-        #         rospy.Publisher(filt_topic, PointCloud2, queue_size=1)
-        #     )
+        for i, fr in enumerate(frames):
+            # filtered points
+            filt_topic = '/filtered_' + topic_postfix[i]
+            filt_pubs.append(
+                rospy.Publisher(filt_topic, PointCloud2, queue_size=1)
+            )
 
-        #     h = Header()
-        #     h.stamp = rospy.Time.now()
-        #     h.frame_id = fr
-        #     filts.append(
-        #         pc2.create_cloud_xyz32(h, self.filtered_pts[lidars[i]])
-        #     )
+            h = Header()
+            h.stamp = rospy.Time.now()
+            h.frame_id = fr
+            filts.append(
+                pc2.create_cloud_xyz32(h, self.filtered_pts[lidars[i]])
+            )
 
-        #     # detected ground planes
-        #     plane_topic = '/plane_' + topic_postfix[i]
-        #     plane_pubs.append(
-        #         rospy.Publisher(plane_topic, PolygonStamped, queue_size=5)
-        #     )
+            # detected ground planes
+            plane_topic = '/plane_' + topic_postfix[i]
+            plane_pubs.append(
+                rospy.Publisher(plane_topic, PolygonStamped, queue_size=5)
+            )
 
-        #     p = PolygonStamped()
-        #     p.header.stamp = rospy.Time.now()
-        #     p.header.frame_id = fr
-        #     p.polygon.points = []
-        #     for (y, z) in [(0.1, 0.1), (0.1, -0.1), (-0.1, -0.1), (-0.1, 0.1)]:
-        #         pt = Point32()
-        #         pt.y = y
-        #         pt.z = z
-        #         pt.x = (
-        #             plane_eqs[i][1] * y + plane_eqs[i][2] * z + plane_eqs[i][3]
-        #         ) / -plane_eqs[i][0]
-        #         p.polygon.points.append(pt)
-        #     planes.append(p)
+            p = PolygonStamped()
+            p.header.stamp = rospy.Time.now()
+            p.header.frame_id = fr
+            p.polygon.points = []
+            for (y, z) in [(0.1, 0.1), (0.1, -0.1), (-0.1, -0.1), (-0.1, 0.1)]:
+                pt = Point32()
+                pt.y = y
+                pt.z = z
+                pt.x = (
+                    plane_eqs[i][1] * y + plane_eqs[i][2] * z + plane_eqs[i][3]
+                ) / -plane_eqs[i][0]
+                p.polygon.points.append(pt)
+            planes.append(p)
 
-        # rate = rospy.Rate(1)
-        # while not rospy.is_shutdown():
-        #     for i in range(3):
-        #         plane_pubs[i].publish(planes[i])
-        #         filt_pubs[i].publish(filts[i])
+        rate = rospy.Rate(1)
+        while not rospy.is_shutdown():
+            for i in range(3):
+                plane_pubs[i].publish(planes[i])
+                filt_pubs[i].publish(filts[i])
 
-        #     rate.sleep()
+            rate.sleep()
 
         return formatted_tfs
 
@@ -438,7 +438,7 @@ class Calibration:
         assert(T.shape == (4, 4))
         assert(R.shape == (3,3))
         
-        T[0:3,0:3] = T[0:3,0:3]@R
+        T[0:3,0:3] = R@T[0:3,0:3]
         return T
 
     def _front_lidar_tfs_initial_guess(self) -> Tuple[np.ndarray, np.ndarray]:
