@@ -43,16 +43,16 @@ class Calibration:
     BACK_MOUNT_HEIGHT_GUESS: float = 25
 
     MAX_NUM_BACK_ULTRASONIC_READINGS: int = 50
-    MIN_NUM_BACK_LIDAR_READINGS: int = 10
+    MIN_NUM_BACK_LIDAR_READINGS: int = 100
 
     def __init__(self):
         rospy.init_node('calibrate_lidar_transforms')
 
         # initialize back distance subscriber
         # TODO: change ultrasonic topic
-        self._back_ultrasonic_subscriber = rospy.Subscriber(
-            constants.BACK_ULTRASONIC_TOPIC, Float32, self._ultrasonic_reading_callback
-        )
+        # self._back_ultrasonic_subscriber = rospy.Subscriber(
+        #     constants.BACK_ULTRASONIC_TOPIC, Float32, self._ultrasonic_reading_callback
+        # )
         # keep track of readings from back ultrasonic
         self._back_ultrasonic_distances = collections.deque([], Calibration.MAX_NUM_BACK_ULTRASONIC_READINGS)
 
@@ -83,6 +83,7 @@ class Calibration:
 
     """Records an ultrasonic reading for a given sensor in self._back_lidar_distances"""
     def _back_lidar2d_callback(self, msg: PointCloud2) -> None:
+        print("in lidar callback!")
         # read pointclud msg        
         points = pc2.read_points(msg, skip_nans=True, field_names=('x', 'y', 'z'))
         # convert points to distances
@@ -216,22 +217,21 @@ class Calibration:
             self.wait_for_lidar_data.sleep()
 
         # delete back ultrasonic and lidar subscriptions as they are no longer needed
-        self._back_ultrasonic_subscriber.unregister()
-        self._back_ultrasonic_subscriber = None
+        # self._back_ultrasonic_subscriber.unregister()
+        # self._back_ultrasonic_subscriber = None
         self._back_lidar2d_subscriber.unregister()
         self._back_lidar2d_subscriber = None
 
         # calculate average distance
-        back_ultrasonic_dist = float(np.mean(self._back_ultrasonic_distances))
+        # back_ultrasonic_dist = float(np.mean(self._back_ultrasonic_distances))
         back_lidar_dist = float(np.mean(self._back_lidar_distances)) * 100  # convert from m to cm
 
         # # add calculated correction factor to lidar distance
         # back_lidar_dist += self._lidar_distance_offset(back_lidar_dist)
 
         # print measured distances
-        rospy.loginfo("Back Ultrasonic Distances (cm): %f\n\n", back_ultrasonic_dist)
-        rospy.loginfo("Back Ultrasonic Distance (cm): %f\n\n", back_ultrasonic_dist)
-        rospy.loginfo("Back Lidar Distance (cm): %f", back_lidar_dist)
+        # rospy.loginfo("Back Ultrasonic Distance (cm): %f\n\n", back_ultrasonic_dist)
+        rospy.loginfo("Back Lidar Distance (cm): %f\n\n\n", back_lidar_dist)
 
         # # add offsets to intersection point
         # back_ultrasonic_dist += constants.BACK_MOUNT_ULTRASONIC_TO_INTERSECTION_CM
@@ -433,7 +433,7 @@ class Calibration:
 
         #     rate.sleep()
 
-        return formatted_tfs
+        # return formatted_tfs
 
     def _apply_rotation_to_tf(self, T: np.ndarray, R: np.ndarray) -> np.ndarray:
         assert(T.shape == (4, 4))

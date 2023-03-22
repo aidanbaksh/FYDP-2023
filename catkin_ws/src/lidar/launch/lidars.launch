@@ -16,11 +16,11 @@
     <param name="duration" value="$(arg pulse_duration)"/>
     <param name="lidar_num" value="0"/>
     <!-- in mm/mm and mm-->
-    <param name="dist_err_slope" value = "0.0802"/>
-    <param name="dist_err_offset" value = "61.554"/>
+    <!-- <param name="dist_err_slope" value = "0.0802"/>
+    <param name="dist_err_offset" value = "61.554"/> -->
     <!-- cosine of desired angle -->
-    <param name="filt_cos_horiz" value = "0.53"/>
-    <param name="filt_cos_vert" value = "0.883"/>
+    <!-- <param name="filt_cos_horiz" value = "0.53"/>
+    <param name="filt_cos_vert" value = "0.883"/> -->
   </node>
   <node pkg="cyglidar_d1" type="cyglidar_pcl_publisher" name="bob" output="screen">
     <param name="port" value="/dev/lidar_left"/>
@@ -32,11 +32,11 @@
     <param name="duration" value="$(arg pulse_duration)"/>
     <param name="lidar_num" value="1"/>
     <!-- in mm/mm and mm-->
-    <param name="dist_err_slope" value = "0.0802"/>
-    <param name="dist_err_offset" value = "61.554"/>
+    <!-- <param name="dist_err_slope" value = "0.0802"/>
+    <param name="dist_err_offset" value = "61.554"/> -->
     <!-- cosine of desired angle -->
-    <param name="filt_cos_horiz" value = "0.53"/>
-    <param name="filt_cos_vert" value = "0.883"/>
+    <!-- <param name="filt_cos_horiz" value = "0.53"/>
+    <param name="filt_cos_vert" value = "0.883"/> -->
   </node>
   <node pkg="cyglidar_d1" type="cyglidar_pcl_publisher" name="carl" output="screen">
     <param name="port" value="/dev/lidar_right"/>
@@ -48,10 +48,10 @@
     <param name="duration" value="$(arg pulse_duration)"/>
     <param name="lidar_num" value="2"/>
     <!-- in mm/mm and mm-->
-    <param name="dist_err_slope" value = "0.0802"/>
-    <param name="dist_err_offset" value = "21.554"/>
+    <!-- <param name="dist_err_slope" value = "0.0802"/>
+    <param name="dist_err_offset" value = "21.554"/> -->
     <!-- cosine of desired angle -->
-    <param name="filt_cos_horiz" value = "0.53"/>
-    <param name="filt_cos_vert" value = "0.883"/>
+    <!-- <param name="filt_cos_horiz" value = "0.53"/>
+    <param name="filt_cos_vert" value = "0.883"/> -->
   </node>
 </launch>
