@@ -8,7 +8,7 @@ constexpr uint8_t I2C_ADDR = 0x10;
 constexpr size_t NUM_ULTRASONICS = 7;
 constexpr unsigned int TRIGGER = 12;
 constexpr unsigned int ECHO[NUM_ULTRASONICS] = {
-  2, // right side
+  3, // right side
   9, // front right housing
   4, // front right side
   5, // back
