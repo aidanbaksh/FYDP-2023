@@ -144,137 +144,12 @@ void find_plane(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud, pcl::ModelCoeff
   seg.segment(*inliers, *coefficients);
 }
 
+double ground_dist = -1;
 void find_curbs (pcl::PCLPointCloud2::Ptr cloud_blob)
 {
   double highestZ = -1;
-  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>);
 
-  pcl::fromPCLPointCloud2(*cloud_blob, *cloud_filtered);
-  pcl::PassThrough<pcl::PointXYZ> rough_ground_pass;
-  pcl::PointCloud<pcl::PointXYZ>::Ptr rough_ground(new pcl::PointCloud<pcl::PointXYZ>);
-  rough_ground_pass.setInputCloud(cloud_filtered);
-  rough_ground_pass.setFilterFieldName("z");
-  rough_ground_pass.setFilterLimits(-1.0, -0.1);
-  rough_ground_pass.filter(*rough_ground);
-
-  pcl::ModelCoefficients::Ptr rough_coefficients (new pcl::ModelCoefficients());
-  pcl::PointIndices::Ptr rough_inliers(new pcl::PointIndices());
-  find_plane(rough_ground, rough_coefficients, rough_inliers, 0.05, 0.025);
-  if(rough_inliers->indices.size() > 0){
-    //plane found
-    if(abs(rough_coefficients->values[3]) < abs(highestZ)){
-      highestZ = -(rough_coefficients->values[3]);
-    }
-    pcl::PassThrough<pcl::PointXYZ> pass;
-    pass.setInputCloud(cloud_filtered);
-    pcl::PointCloud<pcl::PointXYZ>::Ptr ground(new pcl::PointCloud<pcl::PointXYZ>);
-    pcl::PointCloud<pcl::PointXYZ>::Ptr not_ground(new pcl::PointCloud<pcl::PointXYZ>);
-    pass.setFilterFieldName("z");
-    pass.setFilterLimits(-abs(rough_coefficients->values[3])-0.1, -abs(rough_coefficients->values[3])+0.1);
-    pass.filter(*ground);
-
-    pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients());
-    pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
-    find_plane(ground, coefficients, inliers, 0.03, 0.01);
-    pcl::PointCloud<pcl::PointXYZ>::Ptr potential_curb(new pcl::PointCloud<pcl::PointXYZ>);
-    pcl::PointCloud<pcl::PointXYZ>::Ptr front_curb(new pcl::PointCloud<pcl::PointXYZ>);
-    if(inliers->indices.size() > 0){
-      if(abs(coefficients->values[3]) < abs(highestZ)){
-        highestZ = -(coefficients->values[3]);
-      }
-      std::pair<pcl::PointCloud<pcl::PointXYZ>::Ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr> segResult = seperate_clouds(inliers, ground);
-      pcl::PassThrough<pcl::PointXYZ> notGroundPass;
-      notGroundPass.setInputCloud(cloud_filtered);
-      notGroundPass.setFilterFieldName("z");
-      notGroundPass.setFilterLimits(-abs(coefficients->values[3])-0.05, -abs(coefficients->values[3])+0.05);
-      notGroundPass.setNegative(true);
-      notGroundPass.filter(*not_ground);
-
-      pcl::PassThrough<pcl::PointXYZ> curbPass;
-      curbPass.setInputCloud(not_ground);
-      curbPass.setFilterFieldName("z");
-      curbPass.setFilterLimits(-abs(coefficients->values[3])-0.20, -abs(coefficients->values[3])+0.20);
-      curbPass.filter(*potential_curb);
-
-      pcl::PassThrough<pcl::PointXYZ> frontPass;
-      frontPass.setInputCloud(potential_curb);
-      frontPass.setFilterFieldName("x");
-      frontPass.setFilterLimits(0, 2);
-      frontPass.filter(*front_curb);
-      
-
-      pcl::ModelCoefficients::Ptr curb_coeffs (new pcl::ModelCoefficients());
-      pcl::PointIndices::Ptr curb_inliers(new pcl::PointIndices());
-      find_plane(front_curb, curb_coeffs, curb_inliers, 0.03, 0.2);
-      std::cout << curb_inliers->indices.size() << std::endl;
-      if(curb_inliers->indices.size() > 750 && abs(abs(curb_coeffs->values[3])-abs(coefficients->values[3])) > 0.05){
-        //std::cout<<"curb difference: " << abs(abs(curb_coeffs->values[3])-abs(coefficients->values[3]))<< std::endl;
-        if(abs(curb_coeffs->values[3]) < abs(highestZ)){
-          highestZ = -(curb_coeffs->values[3]);
-        }
-        double xCurbSum = 0;
-        double yCurbSum = 0;
-        int curbPCounter = 0;
-        for(int it : curb_inliers->indices){
-          xCurbSum += front_curb->points[it].x;
-          yCurbSum += front_curb->points[it].y;
-          curbPCounter++;
-        }
-        double curbCenterX = xCurbSum/curbPCounter;
-        double curbCenterY = yCurbSum/curbPCounter;
-        //std::cout << "curb plane center x: " << curbCenterX << " center y: " << curbCenterY << std::endl;
-        // if(abs(curb_coeffs->values[3]) - abs(coefficients->values[3]) < 0){
-        //   std::cout << "Curb up detected ";
-        // }else{
-        //   std::cout << "Curb down detected ";
-        // }
-        audio_feedback::LidarCurb curbMessage;
-        curbMessage.front = 0;
-        curbMessage.front_right = 0;
-        curbMessage.front_left = 0;
-        curbMessage.back = 0;
-        std::cout << "Curb detected " << std::endl;
-        if(curbCenterX < 0){
-          curbMessage.back = 1;
-          std::cout << "back center";
-        }
-        if(curbCenterY > 0.25){
-          curbMessage.front_left = 1;
-          std::cout << "front left";
-        }else if(curbCenterY < -0.25){
-          curbMessage.front_right = 1;
-          std::cout << "front right";
-        }else{
-          curbMessage.front = 1;
-          std::cout << "front center";
-        }
-        std::cout << std::endl;
-        pub_curb.publish(curbMessage);
-        std::pair<pcl::PointCloud<pcl::PointXYZ>::Ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr> curbResult = seperate_clouds(curb_inliers, front_curb);
-        pcl::PCLPointCloud2 curb_cloud;
-        pcl::toPCLPointCloud2(*(curbResult.second), curb_cloud);
-        curb_cloud.header.frame_id = "wheelchair";
-        pub_curb_cloud.publish(curb_cloud);
-      }
-      pcl::PCLPointCloud2 ground_cloud;
-      pcl::toPCLPointCloud2(*(segResult.second), ground_cloud);
-      ground_cloud.header.frame_id = "wheelchair";
-      pub_ground.publish(ground_cloud);
-
-      pcl::PointCloud<pcl::PointXYZ>::Ptr objectSegCloud(new pcl::PointCloud<pcl::PointXYZ>);
-      pcl::PassThrough<pcl::PointXYZ> removeNegatives;
-      removeNegatives.setInputCloud(not_ground);
-      removeNegatives.setFilterFieldName("z");
-      removeNegatives.setFilterLimits(-abs(highestZ)+0.2, 0.5);
-      removeNegatives.filter(*objectSegCloud);
-      find_objects(objectSegCloud);
-    }
-
-      pcl::PCLPointCloud2 not_ground_cloud;
-      pcl::toPCLPointCloud2(*not_ground, not_ground_cloud);
-      not_ground_cloud.header.frame_id = "wheelchair";
-      pub_ng.publish(not_ground_cloud);
-  }
+  pcl::PointCloud<pcl::PointXYZ>::Ptr
 }
 
 pcl::PointCloud<pcl::PointXYZ>::Ptr sumPointClouds(new pcl::PointCloud<pcl::PointXYZ>);
@@ -291,7 +166,7 @@ void cloud_cb(const pcl::PCLPointCloud2ConstPtr& cloud_blob){
   pcl::CropBox<pcl::PointXYZ> distanceFilter;
   //0.25 and 0.75
   distanceFilter.setMin(Eigen::Vector4f(-1, -1, -0.5, 1.0));
-  distanceFilter.setMax(Eigen::Vector4f(1.5, 1, 0.5, 1.0));
+  distanceFilter.setMax(Eigen::Vector4f(2, 1, 0.5, 1.0));
   distanceFilter.setInputCloud(converted_cloud);
   distanceFilter.filter(*distance_filtered_cloud);
 
