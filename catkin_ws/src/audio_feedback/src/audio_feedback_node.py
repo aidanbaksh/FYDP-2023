@@ -57,8 +57,7 @@ class SoundManager:
             print("Invalid Severity: {}".format(sev))
             return False
         
-        self.setPathFromInputs(h_type, dir)
-        # self.setMessageFromInputs(h_type, dir)
+        self.setPathFromInputs(h_type, dir, sev)
         if self.checkTimeDelay(sev):
             print("Playing: {}".format(self._request_path)) #Change to warning/log message
             self._audio_player.apply_async(playsound, self._request_path)
@@ -87,7 +86,7 @@ class SoundManager:
     def setLastPlayedTime(self, path):
         self._last_played_dict[path] = rospy.Time.now()
 
-    def setPathFromInputs(self, h_type: HazardType, dir: Direction) -> None:
+    def setPathFromInputs(self, h_type: HazardType, dir: Direction, sev: Severity) -> None:
         path = os.path.abspath(os.path.join(os.environ.get('AUDIO_FILES_DIR'))) + '/'
 
         if h_type == HazardType.CURB:
@@ -113,38 +112,15 @@ class SoundManager:
             path += "_left"
         elif dir == Direction.FRONT_LEFT: 
             path += "_front_left"
+        
+        if h_type == HazardType.TIP:
+            if sev == Severity.HIGH:
+                path += "_high"
+            else:
+                path += "_low"
 
         self._request_path = path
 
-    def setMessageFromInputs(self, h_type: HazardType, dir: Direction) -> None:
-        msg = ""
-
-        if h_type == HazardType.CURB:
-            msg += "Curb "
-        elif h_type == HazardType.OBJECT:
-            msg += "Object "
-        elif h_type == HazardType.TIP:
-            msg += "Tip "
-        
-        if dir == Direction.FRONT:
-            msg += "Front"
-        elif dir == Direction.FRONT_RIGHT: 
-            msg += "Front Right"
-        elif dir == Direction.RIGHT: 
-            msg += "Right"
-        elif dir == Direction.BACK_RIGHT: 
-            msg += "Back Right"
-        elif dir == Direction.BACK: 
-            msg += "Back"
-        elif dir == Direction.BACK_LEFT: 
-            msg += "Back Left"
-        elif dir == Direction.LEFT: 
-            msg += "Left"
-        elif dir == Direction.FRONT_LEFT: 
-            msg += "Front Left"
-
-        self._request_message = msg
-        
 
 if __name__ == '__main__':
     manager = SoundManager()

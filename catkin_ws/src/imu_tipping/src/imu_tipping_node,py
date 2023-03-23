@@ -1,0 +1,58 @@
+#!/usr/bin/env python3
+
+from multiprocessing.pool import ThreadPool
+
+import rospy
+import math
+from std_msgs.msg import Float32, Bool
+from audio_feedback.msg import TipWarning
+from i2c.msg import IMU
+
+
+class TipDetector:
+    def __init__(self):
+        rospy.init_node('imu_tipping')
+
+        # subscribe to the imu topic
+        self._imu_data_subscriber = rospy.Subscriber(
+            '/imu', IMU, self._imu_callback
+        )
+
+        self._g = 9.81
+        self._crit_ang = math.pi*30/180
+        self._cos_low_sev_thresh = math.cos(self._crit_ang/2)
+        self._cos_high_sev_thresh = math.cos(self._crit_ang)
+
+        self._tip_warning_publisher = rospy.Publisher('/imu/tip_warning', TipWarning, queue_size=10)
+    
+    def _imu_callback(self, msg: IMU) -> None:
+        z = msg.acceleration.x
+        y = msg.acceleration.y
+        x = msg.acceleration.z
+        mag = math.sqrt(z**2 + x**2 + y**2)
+        if mag < self._g/2:
+            return
+
+        if mag < self._g:        
+            min_cos = max_cos = abs(z/mag)
+        else:
+            min_cos = 1 - math.sqrt(x**2 + y**2)/mag
+            max_cos = abs(z/mag)
+        
+        if min_cos > self._cos_high_sev_thresh:
+            self._publish_tip_warning(0, 2)
+        elif max_cos > self._cos_low_sev_thresh:
+            self._publish_tip_warning(0, 0)
+
+
+    def _publish_tip_warning(self, dir: int, sev: int) -> None:
+        new_msg = TipWarning()
+        new_msg.direction = dir
+        new_msg.severity = sev
+        self._tip_warning_publisher.publish(new_msg)
+        
+
+
+if __name__ == '__main__':
+    detector = TipDetector()
+    rospy.spin()
