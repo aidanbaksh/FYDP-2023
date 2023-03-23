@@ -289,6 +289,18 @@ class Calibration:
         left_ground_plane_eqn = self._get_ground_plane(LiDAR.LEFT)
         right_ground_plane_eqn = self._get_ground_plane(LiDAR.RIGHT)
 
+        ### AIDAN'S CALIBRATION IMPROVEMENTS BEGIN
+        back_ground_plane_normal = self._get_plane_normal_vector(back_ground_plane_eqn)
+        cos_z = abs(back_ground_plane_normal[2]/np.linalg.norm(back_ground_plane_normal))
+        back_lidar_pitch = np.degrees(np.arccos(cos_z))
+        
+        back_tf = self._back_lidar_tf_matrix(
+            back_lidar_pitch,
+            np.array([back_lidar_x_offset, 0, back_lidar_z_offset])
+        )
+        ### AIDAN's CALIBRATION IMPROVEMENTS END
+
+
         # find rotation to make ground plane equivalent to xy plane
         e_3 = np.array([0, 0, 1])
 
