@@ -4,7 +4,7 @@ from enum import Enum
 
 import rospy
 from std_msgs.msg import Float32, Bool
-from audio_feedback.msg import AudioWarning, LidarCurb, LidarObject, UltrasonicCurb, UltrasonicObject
+from audio_feedback.msg import AudioWarning, LidarCurb, LidarObject, UltrasonicCurb, UltrasonicObject, TipWarning
 
 from custom_enums import HazardType, Direction, Severity
 
@@ -58,6 +58,10 @@ class Aggregator:
             '/lidar/object_detect', LidarObject, self._lidar_object_callback
         )
 
+        self._tip_warning_subscriber = rospy.Subscriber(
+            '/imu/tip_warning', TipWarning, self._tip_warning_callback
+        )
+
     # Ultrasonic callbacks
     def _l_US_callback(self, msg: UltrasonicObject) -> None:
         self._process_US_object_detection(msg, Direction.LEFT)
@@ -105,6 +109,9 @@ class Aggregator:
             self._publish_message(HazardType.OBJECT, Direction.FRONT_LEFT, Severity.LOW)
         if msg.back:
             self._publish_message(HazardType.OBJECT, Direction.BACK, Severity.LOW)
+
+    def _tip_warning_callback(self, msg: TipWarning) -> None:
+        self._publish_message(HazardType.TIP, Direction(msg.direction), Severity(msg.severity))
 
     def _publish_message(self, h_type: HazardType, dir: Direction, sev: Severity) -> None:
             new_msg = AudioWarning()
