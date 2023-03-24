@@ -39,9 +39,9 @@ class TipDetector:
             min_cos = 1 - math.sqrt(x**2 + y**2)/mag
             max_cos = abs(z/mag)
         
-        if min_cos > self._cos_high_sev_thresh:
+        if max_cos < self._cos_high_sev_thresh:
             self._publish_tip_warning(0, 2)
-        elif max_cos > self._cos_low_sev_thresh:
+        elif min_cos < self._cos_low_sev_thresh:
             self._publish_tip_warning(0, 0)
 
 
