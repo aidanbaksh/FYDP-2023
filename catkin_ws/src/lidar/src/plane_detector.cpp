@@ -2,6 +2,7 @@
 #include <ros/ros.h>
 
 #include <sensor_msgs/PointCloud2.h>
+#include <tf2_ros/transform_listener.h>
 #include <audio_feedback/LidarCurb.h>
 #include <audio_feedback/LidarObject.h>
 #include <pcl_conversions/pcl_conversions.h>
@@ -190,14 +191,14 @@ void find_curbs (pcl::PCLPointCloud2::Ptr cloud_blob)
     pcl::PassThrough<pcl::PointXYZ> ground_pass;
     ground_pass.setInputCloud(cloud_filtered);
     ground_pass.setFilterFieldName("z");
-    ground_pass.setFilterLimits(-ground_dist-0.02, -ground_dist+0.02);
+    ground_pass.setFilterLimits(-ground_dist-0.035, -ground_dist+0.035);
     ground_pass.filter(*ground);
 
     pcl::PointCloud<pcl::PointXYZ>::Ptr not_ground(new pcl::PointCloud<pcl::PointXYZ>);
     pcl::PassThrough<pcl::PointXYZ> notGroundPass;
     notGroundPass.setInputCloud(cloud_filtered);
     notGroundPass.setFilterFieldName("z");
-    notGroundPass.setFilterLimits(-ground_dist-0.05, -ground_dist+0.05);
+    notGroundPass.setFilterLimits(-ground_dist-0.06, -ground_dist+0.06);
     notGroundPass.setNegative(true);
     notGroundPass.filter(*not_ground);
 
@@ -218,9 +219,9 @@ void find_curbs (pcl::PCLPointCloud2::Ptr cloud_blob)
 
     pcl::ModelCoefficients::Ptr curb_coeffs (new pcl::ModelCoefficients());
     pcl::PointIndices::Ptr curb_inliers(new pcl::PointIndices());
-    find_plane(front_curb, curb_coeffs, curb_inliers, 0.03, 0.2);
+    find_plane(front_curb, curb_coeffs, curb_inliers, 0.03, 0.03);
     std::cout << curb_inliers->indices.size() << std::endl;
-    if(curb_inliers->indices.size() > 750 && abs(abs(curb_coeffs->values[3])-ground_dist) > 0.05){
+    if(curb_inliers->indices.size() > 500 && abs(abs(curb_coeffs->values[3])-ground_dist) > 0.08){
       //std::cout<<"curb difference: " << abs(abs(curb_coeffs->values[3])-abs(coefficients->values[3]))<< std::endl;
       if(abs(curb_coeffs->values[3]) < abs(highestZ)){
         highestZ = -(curb_coeffs->values[3]);
@@ -304,15 +305,15 @@ void cloud_cb(const pcl::PCLPointCloud2ConstPtr& cloud_blob){
 
   pcl::CropBox<pcl::PointXYZ> distanceFilter;
   //0.25 and 0.75
-  distanceFilter.setMin(Eigen::Vector4f(-1, -1, -0.5, 1.0));
-  distanceFilter.setMax(Eigen::Vector4f(2, 1, 0.5, 1.0));
+  distanceFilter.setMin(Eigen::Vector4f(-1.2, -1.0, -0.5, 1.0));
+  distanceFilter.setMax(Eigen::Vector4f(2, 1.0, 0.5, 1.0));
   distanceFilter.setInputCloud(converted_cloud);
   distanceFilter.filter(*distance_filtered_cloud);
 
   pcl::PassThrough<pcl::PointXYZ> wheelchair_filter;
   wheelchair_filter.setInputCloud(distance_filtered_cloud);
   wheelchair_filter.setFilterFieldName("x");
-  wheelchair_filter.setFilterLimits(-0.3, 0.8);
+  wheelchair_filter.setFilterLimits(-0.3, 0.6);
   wheelchair_filter.setNegative(true);
   wheelchair_filter.filter(*wheelchair_removed_cloud);
 
@@ -320,7 +321,7 @@ void cloud_cb(const pcl::PCLPointCloud2ConstPtr& cloud_blob){
   //pcl::toPCLPointCloud2(*wheelchair_removed_cloud, wheelchair_rm_blob);
   *sumPointClouds += *wheelchair_removed_cloud;
 
-  if(counter == 5){
+  if(counter == 3){
     counter = 0;
     pcl::PCLPointCloud2::Ptr sum_cloud(new pcl::PCLPointCloud2);
     pcl::toPCLPointCloud2(*sumPointClouds, *sum_cloud);
@@ -328,7 +329,7 @@ void cloud_cb(const pcl::PCLPointCloud2ConstPtr& cloud_blob){
     pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
     pcl::PCLPointCloud2::Ptr avgPtCloud(new pcl::PCLPointCloud2);
     sor.setInputCloud(sum_cloud);
-    sor.setLeafSize(0.035f, 0.035f, 0.025f);
+    sor.setLeafSize(0.035f, 0.035f, 0.015f);
     sor.filter(*avgPtCloud);
     find_curbs(avgPtCloud);
     pub_avg_cloud.publish(avgPtCloud);
@@ -338,12 +339,31 @@ void cloud_cb(const pcl::PCLPointCloud2ConstPtr& cloud_blob){
   counter++;
 }
 
+void ground_tf_callback(){
+
+}
+
 int main (int argc, char** argv)
 {
   ros::init (argc, argv, "plane_detector");
   ros::NodeHandle nh;
 
+  tf2_ros::Buffer tf_buffer(ros::Duration(30));
+  tf2_ros::TransformListener tf_listener(tf_buffer);
+  geometry_msgs::TransformStamped ground_tf;
+
+  try {
+    ground_tf = tf_buffer.lookupTransform(
+        "ground_plane", "wheelchair", ros::Time(0), ros::Duration(30)
+    );
+    ground_dist = abs(ground_tf.transform.translation.z);
+  } catch (tf2::TransformException &ex) {
+    ROS_WARN("%s", ex.what());
+  }
+  
+
   ros::Subscriber sub = nh.subscribe ("/lidar_merged", 1, cloud_cb);
+
   pub_ground = nh.advertise<pcl::PCLPointCloud2> ("/plane_cloud", 1);
   pub_avg_cloud = nh.advertise<pcl::PCLPointCloud2> ("/avg_cloud", 1);
   pub_ng = nh.advertise<pcl::PCLPointCloud2> ("/not_ground_cloud", 1);

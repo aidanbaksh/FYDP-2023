@@ -298,6 +298,8 @@ class Calibration:
             (back_lidar_pitch + back_lidar_pitch_2)/2,
             np.array([back_lidar_x_offset, 0, back_lidar_z_offset])
         )
+
+        wheelchair_to_ground_z = back_ground_plane_eqn[3] - back_pivot_to_lidar_z_offset - constants.BACK_PIVOT_Z_OFFSET
         ### AIDAN'S CALIBRATION IMPROVEMENTS END
 
 

@@ -18,6 +18,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   sensor_msgs
   audio_feedback
+  tf_conversions 
 )
 find_package(Boost REQUIRED COMPONENTS system)
 find_package(PCL 1.2 REQUIRED)
