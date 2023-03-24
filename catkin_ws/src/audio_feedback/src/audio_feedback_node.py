@@ -28,7 +28,7 @@ class SoundManager:
         self._sev_time_delays = {
             Severity.LOW: rospy.Duration(5),
             Severity.MEDIUM: rospy.Duration(5),
-            Severity.HIGH: rospy.Duration(0)
+            Severity.HIGH: rospy.Duration(2.5)
         }
     
     def _audio_warning_callback(self, msg: AudioWarning) -> None:

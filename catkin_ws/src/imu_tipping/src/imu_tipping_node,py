@@ -17,15 +17,18 @@ class TipDetector:
         self._imu_data_subscriber = rospy.Subscriber(
             '/imu', IMU, self._imu_callback
         )
-
+        self._last_played_time = rospy.Time.now()
         self._g = 9.81
-        self._crit_ang = math.pi*30/180
-        self._cos_low_sev_thresh = math.cos(self._crit_ang/2)
+        self._crit_ang = math.pi*16/180
+        self._cos_low_sev_thresh = math.cos(0.75*self._crit_ang)
         self._cos_high_sev_thresh = math.cos(self._crit_ang)
 
-        self._tip_warning_publisher = rospy.Publisher('/imu/tip_warning', TipWarning, queue_size=10)
+        self._tip_warning_publisher = rospy.Publisher('/imu/tip_warning', TipWarning, queue_size=1)
     
     def _imu_callback(self, msg: IMU) -> None:
+        if rospy.Duration(0.5) > rospy.Time.now()-self._last_played_time:
+            return
+        
         z = msg.acceleration.x
         y = msg.acceleration.y
         x = msg.acceleration.z
@@ -41,8 +44,10 @@ class TipDetector:
         
         if max_cos < self._cos_high_sev_thresh:
             self._publish_tip_warning(0, 2)
+            self._last_played_time = rospy.Time.now()
         elif min_cos < self._cos_low_sev_thresh:
             self._publish_tip_warning(0, 0)
+            self._last_played_time = rospy.Time.now()
 
 
     def _publish_tip_warning(self, dir: int, sev: int) -> None:

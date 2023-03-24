@@ -19,7 +19,7 @@ class Aggregator:
         rospy.init_node('aggregator')
 
         # the one and only publisher
-        self._publisher = rospy.Publisher('/audio_warnings', AudioWarning, queue_size=10)
+        self._publisher = rospy.Publisher('/audio_warnings', AudioWarning, queue_size=5)
 
         # subscribe to the various detection topics
         self._l_US_subscriber = rospy.Subscriber(
