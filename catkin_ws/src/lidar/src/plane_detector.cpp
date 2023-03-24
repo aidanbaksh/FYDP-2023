@@ -27,6 +27,7 @@
 ros::Publisher pub_ground;
 ros::Publisher pub_ng;
 ros::Publisher pub_curb_cloud;
+ros::Publisher pub_curb_cloud_back;
 ros::Publisher pub_avg_cloud;
 ros::Publisher pub_object_cloud;
 
@@ -216,11 +217,25 @@ void find_curbs (pcl::PCLPointCloud2::Ptr cloud_blob)
     frontPass.setFilterLimits(0, 2);
     frontPass.filter(*front_curb);
 
+    pcl::PointCloud<pcl::PointXYZ>::Ptr back_curb(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::PassThrough<pcl::PointXYZ> backPass;
+    backPass.setInputCloud(all_curb);
+    backPass.setFilterFieldName("x");
+    backPass.setFilterLimits(-2, 0);
+    backPass.filter(*back_curb);    
+
 
     pcl::ModelCoefficients::Ptr curb_coeffs (new pcl::ModelCoefficients());
     pcl::PointIndices::Ptr curb_inliers(new pcl::PointIndices());
     find_plane(front_curb, curb_coeffs, curb_inliers, 0.03, 0.03);
     std::cout << curb_inliers->indices.size() << std::endl;
+
+    audio_feedback::LidarCurb curbMessage;
+    curbMessage.front = 0;
+    curbMessage.front_right = 0;
+    curbMessage.front_left = 0;
+    curbMessage.back = 0;
+
     if(curb_inliers->indices.size() > 500 && abs(abs(curb_coeffs->values[3])-ground_dist) > 0.08){
       //std::cout<<"curb difference: " << abs(abs(curb_coeffs->values[3])-abs(coefficients->values[3]))<< std::endl;
       if(abs(curb_coeffs->values[3]) < abs(highestZ)){
@@ -242,11 +257,6 @@ void find_curbs (pcl::PCLPointCloud2::Ptr cloud_blob)
       // }else{
       //   std::cout << "Curb down detected ";
       // }
-      audio_feedback::LidarCurb curbMessage;
-      curbMessage.front = 0;
-      curbMessage.front_right = 0;
-      curbMessage.front_left = 0;
-      curbMessage.back = 0;
       std::cout << "Curb detected " << std::endl;
       if(curbCenterX < 0){
         curbMessage.back = 1;
@@ -263,13 +273,31 @@ void find_curbs (pcl::PCLPointCloud2::Ptr cloud_blob)
         std::cout << "front center";
       }
       std::cout << std::endl;
-      pub_curb.publish(curbMessage);
       std::pair<pcl::PointCloud<pcl::PointXYZ>::Ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr> curbResult = seperate_clouds(curb_inliers, front_curb);
       pcl::PCLPointCloud2 curb_cloud;
       pcl::toPCLPointCloud2(*(curbResult.second), curb_cloud);
       curb_cloud.header.frame_id = "wheelchair";
       pub_curb_cloud.publish(curb_cloud);
     }
+
+    pcl::ModelCoefficients::Ptr back_curb_coeffs (new pcl::ModelCoefficients());
+    pcl::PointIndices::Ptr back_curb_inliers(new pcl::PointIndices());
+    find_plane(back_curb, back_curb_coeffs, back_curb_inliers, 0.03, 0.03);
+
+    if(back_curb_inliers->indices.size() > 500 && abs(abs(back_curb_coeffs->values[3])-ground_dist) > 0.08){
+      //std::cout<<"curb difference: " << abs(abs(curb_coeffs->values[3])-abs(coefficients->values[3]))<< std::endl;
+      if(abs(back_curb_coeffs->values[3]) < abs(highestZ)){
+        highestZ = -(curb_coeffs->values[3]);
+      }
+      curbMessage.back = 1;
+      std::pair<pcl::PointCloud<pcl::PointXYZ>::Ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr> curbResult = seperate_clouds(back_curb_inliers, back_curb);
+      pcl::PCLPointCloud2 curb_cloud;
+      pcl::toPCLPointCloud2(*(curbResult.second), curb_cloud);
+      curb_cloud.header.frame_id = "wheelchair";
+      pub_curb_cloud_back.publish(curb_cloud);
+    }
+
+    pub_curb.publish(curbMessage);
 
     pcl::PCLPointCloud2 ground_cloud;
     pcl::toPCLPointCloud2(*ground, ground_cloud);
@@ -368,6 +396,7 @@ int main (int argc, char** argv)
   pub_avg_cloud = nh.advertise<pcl::PCLPointCloud2> ("/avg_cloud", 1);
   pub_ng = nh.advertise<pcl::PCLPointCloud2> ("/not_ground_cloud", 1);
   pub_curb_cloud = nh.advertise<pcl::PCLPointCloud2> ("/curb_cloud", 1);
+  pub_curb_cloud_back = nh.advertise<pcl::PCLPointCloud2> ("/curb_cloud_back", 1);
   pub_object_cloud = nh.advertise<pcl::PCLPointCloud2> ("/object_cloud", 1);
   pub_curb = nh.advertise<audio_feedback::LidarCurb> ("/lidar/curb_detect", 1);
   pub_objects = nh.advertise<audio_feedback::LidarObject> ("/lidar/object_detect", 1);
