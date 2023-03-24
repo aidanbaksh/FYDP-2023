@@ -9,11 +9,11 @@ constexpr size_t NUM_ULTRASONICS = 7;
 constexpr unsigned int TRIGGER = 12;
 constexpr unsigned int ECHO[NUM_ULTRASONICS] = {
   3, // right side
-  9, // front right housing
+  9, // front right
   4, // front right side
   5, // back
-  6, // front left side
-  7, // front left housing
+  7, // front left side
+  6, // front left
   8, // left side
 };
 
