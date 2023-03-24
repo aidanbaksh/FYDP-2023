@@ -32,14 +32,21 @@ while not rospy.is_shutdown():
             marker.mesh_resource = 'package://object_visualizer/meshes/' + file
             marker.mesh_use_embedded_materials = True  # Need this to use textures for mesh
             marker.type = marker.MESH_RESOURCE
-            marker.header.frame_id = "wheelchair"
+            marker.header.frame_id = "ground_plane"
             marker.scale.x = 0.001
             marker.scale.y = 0.001
             marker.scale.z = 0.001
-            marker.pose.position.x = 0.0
-            marker.pose.position.y = 0.0
+            marker.pose.position.x = 0.8
+            marker.pose.position.y = 0.325
             marker.pose.position.z = 0.0
-            marker.pose.orientation.w = 1.0
+            marker.pose.orientation.w = 0.5
+            marker.pose.orientation.x = 0.5
+            marker.pose.orientation.y = -0.5
+            marker.pose.orientation.z = -0.5
+            marker.color.a = 1.0
+            marker.color.r = 1.0
+            marker.color.g = 1.0
+            marker.color.b = 1.0
             markerArray.markers.append(marker)
 
     rospy.loginfo('Published %d objects. ', len(markerArray.markers))

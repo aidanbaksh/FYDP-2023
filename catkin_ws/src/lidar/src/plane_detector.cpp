@@ -235,8 +235,8 @@ void find_curbs (pcl::PCLPointCloud2::Ptr cloud_blob)
     curbMessage.front_right = 0;
     curbMessage.front_left = 0;
     curbMessage.back = 0;
-
-    if(curb_inliers->indices.size() > 500 && abs(abs(curb_coeffs->values[3])-ground_dist) > 0.08){
+    bool front_curb_pub = false;
+    if(curb_inliers->indices.size() > 750 && abs(abs(curb_coeffs->values[3])-ground_dist) > 0.08){
       //std::cout<<"curb difference: " << abs(abs(curb_coeffs->values[3])-abs(coefficients->values[3]))<< std::endl;
       if(abs(curb_coeffs->values[3]) < abs(highestZ)){
         highestZ = -(curb_coeffs->values[3]);
@@ -278,6 +278,13 @@ void find_curbs (pcl::PCLPointCloud2::Ptr cloud_blob)
       pcl::toPCLPointCloud2(*(curbResult.second), curb_cloud);
       curb_cloud.header.frame_id = "wheelchair";
       pub_curb_cloud.publish(curb_cloud);
+    }else{
+      pcl::PointCloud<pcl::PointXYZ>::Ptr planeCloud(new pcl::PointCloud<pcl::PointXYZ>);
+      planeCloud->points.push_back(pcl::PointXYZ(-10, 0, 0));
+      pcl::PCLPointCloud2 curb_cloud;
+      pcl::toPCLPointCloud2(*(planeCloud), curb_cloud);
+      curb_cloud.header.frame_id = "wheelchair";
+      pub_curb_cloud.publish(curb_cloud);
     }
 
     pcl::ModelCoefficients::Ptr back_curb_coeffs (new pcl::ModelCoefficients());
@@ -295,6 +302,13 @@ void find_curbs (pcl::PCLPointCloud2::Ptr cloud_blob)
       pcl::toPCLPointCloud2(*(curbResult.second), curb_cloud);
       curb_cloud.header.frame_id = "wheelchair";
       pub_curb_cloud_back.publish(curb_cloud);
+    }else{
+      pcl::PointCloud<pcl::PointXYZ>::Ptr planeCloud(new pcl::PointCloud<pcl::PointXYZ>);
+      planeCloud->points.push_back(pcl::PointXYZ(-10, 0, 0));
+      pcl::PCLPointCloud2 curb_cloud;
+      pcl::toPCLPointCloud2(*(planeCloud), curb_cloud);
+      curb_cloud.header.frame_id = "wheelchair";
+      pub_curb_cloud_back.publish(curb_cloud);
     }
 
     pub_curb.publish(curbMessage);
@@ -308,7 +322,7 @@ void find_curbs (pcl::PCLPointCloud2::Ptr cloud_blob)
     pcl::PassThrough<pcl::PointXYZ> removeNegatives;
     removeNegatives.setInputCloud(not_ground);
     removeNegatives.setFilterFieldName("z");
-    removeNegatives.setFilterLimits(-abs(highestZ)+0.1, 0.5);
+    removeNegatives.setFilterLimits(-abs(highestZ)+0.10, 0.5);
     removeNegatives.filter(*objectSegCloud);
     find_objects(objectSegCloud);
 

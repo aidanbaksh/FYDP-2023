@@ -17,4 +17,5 @@
   <!-- aggregator and audio feedback -->
   <node pkg="audio_feedback" type="aggregator_node.py" name="aggregator" output="screen"/>
   <node pkg="audio_feedback" type="audio_feedback_node.py" name="audio_feedback" output="screen"/>
+  <include file="$(find object_visualizer)/launch/display.launch"/>
 </launch>
