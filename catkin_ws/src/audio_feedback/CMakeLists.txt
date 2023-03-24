@@ -20,6 +20,7 @@ add_message_files(
   LidarObject.msg
   UltrasonicCurb.msg
   UltrasonicObject.msg
+  TipWarning.msg
 )
 
 generate_messages(
