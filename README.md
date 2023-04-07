@@ -1,6 +1,6 @@
 # FYDP-2023
 
-Authors:
+Authors:\
 Aidan Baksh\
 Josh Bird\
 Charlie Fisher\
